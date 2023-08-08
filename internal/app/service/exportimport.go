@@ -5,6 +5,7 @@ import (
 	b64 "encoding/base64"
 	"encoding/csv"
 	"github.com/rostis232/kobo2googlesheet-db/internal/app/repository"
+	"github.com/rostis232/kobo2googlesheet-db/internal/models"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/option"
 	"google.golang.org/api/sheets/v4"
@@ -108,4 +109,26 @@ func (e *ExpImp) Importer(credentials string, spreadsheetId string, sheetName st
 	}
 
 	return nil
+}
+
+func (e *ExpImp) Sorter(data []models.Data) map[string]map[string][]models.Data {
+	dataByAPIKey := make(map[string][]models.Data)
+
+	for _, d := range data {
+		dataByAPIKey[*d.APIKey] = append(dataByAPIKey[*d.APIKey], d)
+	}
+
+	dataByAPIKeyAndCSVlink := make(map[string]map[string][]models.Data)
+
+	for k, v := range dataByAPIKey {
+		byCSV := make(map[string][]models.Data)
+
+		for _, n := range v {
+			byCSV[*n.CSVLink] = append(byCSV[*n.CSVLink], n)
+		}
+
+		dataByAPIKeyAndCSVlink[k] = byCSV
+	}
+
+	return dataByAPIKeyAndCSVlink
 }
