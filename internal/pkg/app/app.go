@@ -64,7 +64,7 @@ func (a *App) Run() {
 							records, err := a.service.Export(*data.CSVLink, *data.KoboToken)
 							if err != nil {
 								log.Printf("🚫 Error while exporting from Kobo %s: %s\n", *data.FormName, err)
-								continue
+								break
 							}
 							log.Printf("✔️ Info is obtained from form: %s successful.\n", *data.FormName)
 
