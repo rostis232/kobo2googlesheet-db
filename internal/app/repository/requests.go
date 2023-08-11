@@ -17,7 +17,7 @@ func NewRequests(db *sql.DB) *Requests {
 
 func (r *Requests) GetAllData() ([]models.Data, error) {
 	results := []models.Data{}
-	query := "SELECT k.userid, k.kobologin, k.kobolink, k.koboname, k.gslink, k.gsname, k.sheetname, g.ccode FROM model_kobo_g_s k LEFT JOIN model_users_api_g_s g ON k.userid = g.userid"
+	query := "SELECT k.userid, k.status, k.kobologin, k.kobolink, k.koboname, k.gslink, k.gsname, k.sheetname, g.ccode FROM model_kobo_g_s k LEFT JOIN model_users_api_g_s g ON k.userid = g.userid"
 	rows, err := r.db.Query(query)
 	if err != nil {
 		return results, err
@@ -27,6 +27,7 @@ func (r *Requests) GetAllData() ([]models.Data, error) {
 		result := models.Data{}
 		if err = rows.Scan(
 			&result.UserId,
+			&result.Status,
 			&result.KoboToken,
 			&result.CSVLink,
 			&result.FormName,

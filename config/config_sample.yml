@@ -4,3 +4,6 @@ db:
   username: "db_username"
   password: "db_pass"
   dbname: "db_name"
+
+app:
+  sleep-time: "5m"

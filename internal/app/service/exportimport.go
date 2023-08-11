@@ -24,24 +24,24 @@ func NewExpImp(repo repository.Database) *ExpImp {
 	}
 }
 
-func (e *ExpImp) Export(csvLink, token string) ([][]string, error) {
-	client := &http.Client{}
+func (e *ExpImp) Export(csvLink string, token string, client *http.Client) ([][]string, error) {
+	//client := &http.Client{}
 
 	request, err := http.NewRequest("GET", csvLink, nil)
 	if err != nil {
-		return [][]string{{}}, err
+		return nil, err
 	}
 
 	request.Header.Add("Authorization", "Token "+token)
 
 	response, err := client.Do(request)
 	if err != nil {
-		return [][]string{{}}, err
+		return nil, err
 	}
 
 	body, err := io.ReadAll(response.Body)
 	if err != nil {
-		return [][]string{{}}, err
+		return nil, err
 	}
 
 	defer response.Body.Close()
@@ -52,7 +52,7 @@ func (e *ExpImp) Export(csvLink, token string) ([][]string, error) {
 
 	records, err := r.ReadAll()
 	if err != nil {
-		return [][]string{{}}, err
+		return nil, err
 	}
 
 	return records, nil
@@ -80,13 +80,11 @@ func (e *ExpImp) Importer(credentials string, spreadsheetId string, sheetName st
 
 	credBytes, err := b64.StdEncoding.DecodeString(credentials)
 	if err != nil {
-		//log.Println(err)
 		return err
 	}
 
 	config, err := google.JWTConfigFromJSON(credBytes, "https://www.googleapis.com/auth/spreadsheets")
 	if err != nil {
-		//log.Println(err)
 		return err
 	}
 
@@ -94,7 +92,6 @@ func (e *ExpImp) Importer(credentials string, spreadsheetId string, sheetName st
 
 	srv, err := sheets.NewService(ctx, option.WithHTTPClient(client))
 	if err != nil {
-		//log.Println(err)
 		return err
 	}
 
@@ -104,18 +101,18 @@ func (e *ExpImp) Importer(credentials string, spreadsheetId string, sheetName st
 
 	_, err = srv.Spreadsheets.Values.Update(spreadsheetId, sheetName+"!A1:XYZ", row).ValueInputOption("USER_ENTERED").Context(ctx).Do()
 	if err != nil {
-		//log.Println(err)
 		return err
 	}
 
 	return nil
 }
 
+// Sorter sorts data at first by API Key and at second - by CSV Link
 func (e *ExpImp) Sorter(data []models.Data) map[string]map[string][]models.Data {
 	dataByAPIKey := make(map[string][]models.Data)
 
 	for _, d := range data {
-		dataByAPIKey[*d.APIKey] = append(dataByAPIKey[*d.APIKey], d)
+		dataByAPIKey[d.APIKey] = append(dataByAPIKey[d.APIKey], d)
 	}
 
 	dataByAPIKeyAndCSVlink := make(map[string]map[string][]models.Data)
@@ -124,7 +121,7 @@ func (e *ExpImp) Sorter(data []models.Data) map[string]map[string][]models.Data 
 		byCSV := make(map[string][]models.Data)
 
 		for _, n := range v {
-			byCSV[*n.CSVLink] = append(byCSV[*n.CSVLink], n)
+			byCSV[n.CSVLink] = append(byCSV[n.CSVLink], n)
 		}
 
 		dataByAPIKeyAndCSVlink[k] = byCSV
