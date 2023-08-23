@@ -7,6 +7,7 @@ import (
 
 type Database interface {
 	GetAllData() ([]models.Data, error)
+	WriteInfo(id int, info string) error
 }
 
 type Repository struct {

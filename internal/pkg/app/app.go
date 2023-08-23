@@ -1,6 +1,7 @@
 package app
 
 import (
+	"fmt"
 	"github.com/rostis232/kobo2googlesheet-db/internal/app/repository"
 	"github.com/rostis232/kobo2googlesheet-db/internal/app/service"
 	"github.com/rostis232/kobo2googlesheet-db/internal/models"
@@ -75,7 +76,10 @@ func (a *App) Run(sleepTime string) error {
 							}
 							records, err := a.service.Export(data.CSVLink, data.KoboToken, client)
 							if err != nil {
-								log.Printf("🔴 Error while exporting from Kobo %s: %s\n", data.FormName, err)
+								log.Printf("🔴 Error while exporting from Kobo %s (%d): %s\n", data.FormName, data.Id, err)
+								if err := a.repo.WriteInfo(data.Id, fmt.Sprintf("ERROR; %s; %s", time.Now().Format(time.DateTime), fmt.Sprintf("Kobo: %s", err))); err != nil {
+									log.Printf("Error while updating db: %s", err)
+								}
 								client.CloseIdleConnections()
 								break
 							}
@@ -92,10 +96,17 @@ func (a *App) Run(sleepTime string) error {
 
 						err = a.service.Importer(data.APIKey, data.SpreadSheetID, data.SheetName, values)
 						if err != nil {
-							log.Printf("🔴 %s - > %s - Error while importing: %s\n", data.FormName, data.SpreadSheetName, err)
+							log.Printf("🔴 %s - > %s (%d)- Error while importing: %s\n", data.FormName, data.SpreadSheetName, data.Id, err)
+							if err := a.repo.WriteInfo(data.Id, fmt.Sprintf("ERROR; %s; %s", time.Now().Format(time.DateTime), fmt.Sprintf("GoogleSheets: %s", err))); err != nil {
+								log.Printf("Error while updating db: %s", err)
+							}
 							continue
 						}
-						log.Printf("✔️ %s -> %s - success.\n", data.FormName, data.SpreadSheetName)
+						log.Printf("✔️ %s -> %s - success (id %d).\n", data.FormName, data.SpreadSheetName, data.Id)
+						if err := a.repo.WriteInfo(data.Id, fmt.Sprintf("Ok; %s", time.Now().Format(time.DateTime))); err != nil {
+							log.Printf("Error while updating db: %s", err)
+						}
+
 					}
 				}
 
