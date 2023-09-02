@@ -4,14 +4,16 @@ import (
 	"context"
 	b64 "encoding/base64"
 	"encoding/csv"
+	"io"
+	"log"
+	"net/http"
+	"strings"
+
 	"github.com/rostis232/kobo2googlesheet-db/internal/app/repository"
 	"github.com/rostis232/kobo2googlesheet-db/internal/models"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/option"
 	"google.golang.org/api/sheets/v4"
-	"io"
-	"net/http"
-	"strings"
 )
 
 type ExpImp struct {
@@ -26,6 +28,13 @@ func NewExpImp(repo repository.Database) *ExpImp {
 
 func (e *ExpImp) Export(csvLink string, token string, client *http.Client) ([][]string, error) {
 	//client := &http.Client{}
+
+	cutedLink, founded := strings.CutPrefix(csvLink, "https://kobo.humanitarianresponse.info/")
+
+	if founded {
+		csvLink = "https://eu.kobotoolbox.org/" + cutedLink
+		log.Printf("Founded old URL, changed to new domen: %s", csvLink)
+	}
 
 	request, err := http.NewRequest("GET", csvLink, nil)
 	if err != nil {
