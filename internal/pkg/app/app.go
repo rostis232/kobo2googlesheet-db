@@ -29,6 +29,7 @@ func NewApp(dbconf repository.Config) (*App, error) {
 }
 
 func (a *App) Run(sleepTime string) error {
+	var dataCache []models.Data
 	sleepTimeParsedDuration, err := time.ParseDuration(sleepTime)
 	if err != nil {
 		return err
@@ -38,9 +39,14 @@ func (a *App) Run(sleepTime string) error {
 
 		data, err := a.repo.GetAllData()
 		if err != nil {
-			log.Printf("🔴 Error while getting data from DB: %s.Waiting 10 minutes.\n", err)
-			time.Sleep(10 * time.Minute)
-			continue
+			log.Printf("🔴 Error while getting data from DB: %s. If there is previous data it will be used in this itereation.\n", err)
+			if len(dataCache) == 0 {
+				log.Printf("🔴 Previous data is empty. I will try to connect to DB in 10 minutes.\n")
+				time.Sleep(10 * time.Minute)
+				continue
+			}
+		} else {
+			dataCache = data
 		}
 
 		log.Println("✔️ Data is successfully retrieved from DB.")
