@@ -35,6 +35,15 @@ func (a *App) Run(sleepTime string) error {
 		return err
 	}
 	for {
+
+		iterationStartTime := time.Now()
+
+		if iterationStartTime.Hour() >= 1 && iterationStartTime.Hour() < 7 {
+			fmt.Println("Sleep time....")
+			time.Sleep(time.Hour)
+			continue
+		}
+
 		log.Println("✔️ New iteration started")
 
 		data, err := a.repo.GetAllData()
