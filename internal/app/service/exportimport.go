@@ -4,11 +4,12 @@ import (
 	"context"
 	b64 "encoding/base64"
 	"encoding/csv"
+	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"strings"
 
+	"github.com/rostis232/kobo2googlesheet-db/internal/app/logwriter"
 	"github.com/rostis232/kobo2googlesheet-db/internal/app/repository"
 	"github.com/rostis232/kobo2googlesheet-db/internal/models"
 	"golang.org/x/oauth2/google"
@@ -33,7 +34,9 @@ func (e *ExpImp) Export(csvLink string, token string, client *http.Client) ([][]
 
 	if founded {
 		csvLink = "https://eu.kobotoolbox.org/" + cutedLink
-		log.Printf("Founded old URL, changed to new domen: %s", csvLink)
+		if err := logwriter.WriteLogToFile(fmt.Sprintf("Founded old URL, changed to new domen: %s", csvLink)); err != nil {
+			fmt.Println(err)
+		}
 	}
 
 	request, err := http.NewRequest("GET", csvLink, nil)

@@ -7,3 +7,4 @@ db:
 
 app:
   sleep-time: "5m"
+  log-level: "1"

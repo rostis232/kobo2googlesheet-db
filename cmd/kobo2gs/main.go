@@ -24,7 +24,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error while creating new app: %s\n", err)
 	}
-	if a.Run(viper.GetString("app.sleep-time")) != nil {
+	if a.Run(viper.GetString("app.sleep-time"), viper.GetString("app.log-level")) != nil {
 		log.Fatalf("Error while running app: %s\n", err)
 	}
 
