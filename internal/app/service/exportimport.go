@@ -111,7 +111,11 @@ func (e *ExpImp) Importer(credentials string, spreadsheetId string, sheetName st
 		Values: values,
 	}
 
-	_, err = srv.Spreadsheets.Values.Update(spreadsheetId, sheetName+"!A1:XYZ", row).ValueInputOption("USER_ENTERED").Context(ctx).Do()
+	if !strings.Contains(sheetName, "!") {
+		sheetName += "!A1:XYZ"
+	}
+
+	_, err = srv.Spreadsheets.Values.Update(spreadsheetId, sheetName, row).ValueInputOption("USER_ENTERED").Context(ctx).Do()
 	if err != nil {
 		return err
 	}
