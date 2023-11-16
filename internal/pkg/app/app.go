@@ -3,8 +3,8 @@ package app
 import (
 	"fmt"
 	"net/http"
-	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -33,10 +33,6 @@ func NewApp(dbconf repository.Config) (*App, error) {
 }
 
 func (a *App) Run(sleepTime string, logLevel string) error {
-	err := os.Mkdir("logs", 0777)
-	if err != nil {
-		fmt.Println(err)
-	}
 	logLevelInt, err := strconv.Atoi(logLevel)
 	if err != nil {
 		fmt.Println(err)
@@ -139,6 +135,16 @@ func (a *App) Run(sleepTime string, logLevel string) error {
 								fmt.Println(err)
 							}
 
+							if strings.Contains(data.SpreadSheetName, " -wot") {
+								records = records[1:]
+								fmt.Printf("%s: Founded -wot: deleted titles", data.SpreadSheetName)
+							}
+
+							if strings.Contains(data.SpreadSheetName, " -idx") {
+								fmt.Printf("%s: Founded -idx: changing index", data.SpreadSheetName)
+								records = changingIndex(records)
+							}
+
 							values = a.service.Converter(records)
 						}
 
@@ -183,4 +189,29 @@ func (a *App) Run(sleepTime string, logLevel string) error {
 		}
 		time.Sleep(sleepTimeParsedDuration)
 	}
+}
+
+func changingIndex(input [][]string) [][]string {
+	indexId := 0
+	for rowId, cells := range input {
+		for cellId, cellValue := range cells {
+			if rowId == 0 {
+				if cellValue == "_index" {
+					indexId = cellId
+				}
+			} else {
+				if indexId == 0 {
+					fmt.Println("Index not found")
+					return input
+				} else {
+					if cellId == indexId {
+						input[rowId][cellId] = "i"+cellValue
+					}
+				}
+
+			}
+
+		}
+	}
+	return input
 }

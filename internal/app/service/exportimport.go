@@ -113,6 +113,8 @@ func (e *ExpImp) Importer(credentials string, spreadsheetId string, sheetName st
 
 	if !strings.Contains(sheetName, "!") {
 		sheetName += "!A1:XYZ"
+	} else {
+		fmt.Println("❤️❤️❤️❤️", sheetName)
 	}
 
 	_, err = srv.Spreadsheets.Values.Update(spreadsheetId, sheetName, row).ValueInputOption("USER_ENTERED").Context(ctx).Do()
