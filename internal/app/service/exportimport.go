@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/rostis232/kobo2googlesheet-db/internal/app/logwriter"
@@ -15,6 +16,7 @@ import (
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/option"
 	"google.golang.org/api/sheets/v4"
+	"github.com/fatih/color"
 )
 
 type ExpImp struct {
@@ -34,9 +36,7 @@ func (e *ExpImp) Export(csvLink string, token string, client *http.Client) ([][]
 
 	if founded {
 		csvLink = "https://eu.kobotoolbox.org/" + cutedLink
-		if err := logwriter.WriteLogToFile(fmt.Sprintf("Founded old URL, changed to new domen: %s", csvLink)); err != nil {
-			fmt.Println(err)
-		}
+		logwriter.WriteLogToFile(fmt.Sprintf("Founded old URL, changed to new domen: %s", csvLink))
 	}
 
 	request, err := http.NewRequest("GET", csvLink, nil)
@@ -87,7 +87,37 @@ func (e *ExpImp) Converter(strs [][]string) [][]interface{} {
 	return result
 }
 
-func (e *ExpImp) Importer(credentials string, spreadsheetId string, sheetName string, values [][]interface{}) error {
+func (e *ExpImp) Importer(credentials string, spreadSheetName string, spreadsheetId string, sheetName string, records [][]string) error {
+	var err error
+	var decr int = 1
+
+	if !strings.Contains(sheetName, "!") {
+		sheetName += "!A1:XYZ"
+	}
+
+	numberOfRows := getStringNumber(sheetName)
+
+	if strings.Contains(spreadSheetName, " -wot") {
+		decr = 2
+	}
+
+
+	if strings.Contains(spreadSheetName, " -idx") {
+		fmt.Printf("%s: Founded -idx: changing index\n", spreadSheetName)
+		records, err = changingIndex(records, numberOfRows, decr)
+		if err != nil {
+			return fmt.Errorf("error while changing indexes: %s", err)
+		}
+	}
+
+	if strings.Contains(spreadSheetName, " -wot") {
+		records = records[1:]
+		fmt.Printf("%s: Founded -wot: deleted titles\n", spreadSheetName)
+	}
+
+	values := e.Converter(records)
+
+
 	ctx := context.Background()
 
 	credBytes, err := b64.StdEncoding.DecodeString(credentials)
@@ -111,11 +141,6 @@ func (e *ExpImp) Importer(credentials string, spreadsheetId string, sheetName st
 		Values: values,
 	}
 
-	if !strings.Contains(sheetName, "!") {
-		sheetName += "!A1:XYZ"
-	} else {
-		fmt.Println("❤️❤️❤️❤️", sheetName)
-	}
 
 	_, err = srv.Spreadsheets.Values.Update(spreadsheetId, sheetName, row).ValueInputOption("USER_ENTERED").Context(ctx).Do()
 	if err != nil {
@@ -146,4 +171,61 @@ func (e *ExpImp) Sorter(data []models.Data) map[string]map[string][]models.Data 
 	}
 
 	return dataByAPIKeyAndCSVlink
+}
+
+func changingIndex (input [][]string, numberOfRows int, decr int) ([][]string, error) {
+	inputCopy := make([][]string, len(input))
+
+	for i := range input {
+        inputCopy[i] = make([]string, len(input[i]))
+        copy(inputCopy[i], input[i])
+    }
+
+	color.Red("%d, %d", numberOfRows, decr)
+	indexId := 0
+	for rowId, cells := range inputCopy {
+		for cellId, cellValue := range cells {
+			if rowId == 0 {
+				if cellValue == "_index" {
+					indexId = cellId
+				}
+			} else {
+				if indexId == 0 {
+					return inputCopy, fmt.Errorf("index column not found")
+				} else {
+					if cellId == indexId {
+						indexValueInd, err := strconv.Atoi(cellValue)
+						if err != nil {
+							return inputCopy, fmt.Errorf("error while converting string to ind")
+						}
+						strValue := strconv.Itoa(numberOfRows + indexValueInd - decr)
+						if rowId == 0 || rowId == 1 || rowId == 2 {
+							color.Cyan("%s = %d + %d - %d", strValue, numberOfRows, indexValueInd, decr)
+						}
+
+
+						inputCopy[rowId][cellId] = strValue
+					}
+				}
+			}
+		}
+	}
+	return inputCopy, nil
+}
+
+
+func getStringNumber(sheetRange string) int {
+	_, after, ok:= strings.Cut(sheetRange, "!A")
+	if !ok {
+		fmt.Println("Error while getting string number (poin 1)")
+	}
+	before, _, ok := strings.Cut(after, ":")
+	if !ok {
+		fmt.Println("Error while getting string number (poin 2)")
+	}
+	number, err := strconv.Atoi(before)
+	if err != nil {
+		fmt.Println("Error while getting string number (poin 2)")
+	}
+	return number
 }

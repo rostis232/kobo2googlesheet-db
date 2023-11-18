@@ -2,3 +2,4 @@ config/config.yml
 .idea
 .vscode
 vendor
+.fleet

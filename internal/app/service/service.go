@@ -9,7 +9,7 @@ import (
 type ExportImport interface {
 	Export(csvLink, token string, client *http.Client) ([][]string, error)
 	Converter(strs [][]string) [][]interface{}
-	Importer(credentials string, spreadsheetId string, sheetName string, values [][]interface{}) error
+	Importer(credentials string, spreadSheetName string, spreadsheetId string, sheetName string, values [][]string) error
 	Sorter(data []models.Data) map[string]map[string][]models.Data
 }
 

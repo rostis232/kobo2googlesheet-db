@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
+	"github.com/fatih/color"
 	"github.com/rostis232/kobo2googlesheet-db/config"
 	"github.com/rostis232/kobo2googlesheet-db/internal/app/logwriter"
 	"github.com/rostis232/kobo2googlesheet-db/internal/app/repository"
@@ -35,7 +35,7 @@ func NewApp(dbconf repository.Config) (*App, error) {
 func (a *App) Run(sleepTime string, logLevel string) error {
 	logLevelInt, err := strconv.Atoi(logLevel)
 	if err != nil {
-		fmt.Println(err)
+		color.Red("error while converting value of logging level from string to int :%s. Logging level is setted to 0.", err)
 		logLevelInt = 0
 	}
 	config.SetLogLevel(logLevelInt)
@@ -49,26 +49,18 @@ func (a *App) Run(sleepTime string, logLevel string) error {
 		iterationStartTime := time.Now()
 
 		if iterationStartTime.Hour() >= 1 && iterationStartTime.Hour() < 7 {
-			if err := logwriter.WriteLogToFile("Sleep time....\n"); err != nil {
-				fmt.Println(err)
-			}
+			logwriter.WriteLogToFile("Sleep time...")
 			time.Sleep(time.Hour)
 			continue
 		}
 
-		if err := logwriter.WriteLogToFile("✔️ New iteration started\n"); err != nil {
-			fmt.Println(err)
-		}
+		logwriter.WriteLogToFile("✔️ New iteration started")
 
 		data, err := a.repo.GetAllData()
 		if err != nil {
-			if err := logwriter.WriteLogToFile(fmt.Errorf("error while getting data from DB: %s. If there is previous data it will be used in this itereation", err)); err != nil {
-				fmt.Println(err)
-			}
+			logwriter.WriteLogToFile(fmt.Errorf("error while getting data from DB: %s. If there is previous data it will be used in this itereation", err))
 			if len(dataCache) == 0 {
-				if err := logwriter.WriteLogToFile(fmt.Errorf("previous data is empty. I will try to connect to DB in 10 minutes")); err != nil {
-					fmt.Println(err)
-				}
+				logwriter.WriteLogToFile(fmt.Errorf("previous data is empty. I will try to connect to DB in 10 minutes"))
 				time.Sleep(10 * time.Minute)
 				continue
 			}
@@ -76,15 +68,11 @@ func (a *App) Run(sleepTime string, logLevel string) error {
 			dataCache = data
 		}
 
-		if err := logwriter.WriteLogToFile("✔️ Data is successfully retrieved from DB.\n"); err != nil {
-			fmt.Println(err)
-		}
+		logwriter.WriteLogToFile("✔️ Data is successfully retrieved from DB.")
 
 		sortedData := a.service.Sorter(data)
 
-		if err := logwriter.WriteLogToFile("✔️ Data is successfully sorted.\n"); err != nil {
-			fmt.Println(err)
-		}
+		logwriter.WriteLogToFile("✔️ Data is successfully sorted.")
 
 		wg := sync.WaitGroup{}
 
@@ -92,88 +80,62 @@ func (a *App) Run(sleepTime string, logLevel string) error {
 			wg.Add(1)
 
 			go func(keyAPI string, keyLinkMap map[string][]models.Data, wg *sync.WaitGroup) {
+
+
 				defer wg.Done()
-				if err := logwriter.WriteLogToFile(fmt.Sprintf("✔️ Working with API-key`s set: %s.\n", string([]rune(keyAPI)[:100]))); err != nil {
-					fmt.Println(err)
-				}
+				logwriter.WriteLogToFile(fmt.Sprintf("✔️ Working with API-key`s set: %s.\n", string([]rune(keyAPI)[:100])))
 
 				for keyKoboLink, dataSlice := range keyLinkMap {
-					if err := logwriter.WriteLogToFile(fmt.Sprintf("✔️ Working with Kobo-form`s set: %s.\n", keyKoboLink)); err != nil {
-						fmt.Println(err)
-					}
+					logwriter.WriteLogToFile(fmt.Sprintf("✔️ Working with Kobo-form`s set: %s.\n", keyKoboLink))
 
-					var values [][]interface{}
+					var records [][]string
 
 					for _, data := range dataSlice {
+						// //test
+						// if data.SpreadSheetName != "UHF PROT CASE Харків -wot -idx" && data.SpreadSheetName != "UHF PROT CRISIS Харків -wot -idx" && data.SpreadSheetName != "UHF PROT LAW Харків -wot -idx"{
+						// 	continue
+						// }
+						// //test
 
 						if data.Status == 0 {
-							if err := logwriter.WriteLogToFile(fmt.Sprintf("⚠️ %s -> %s - skipped\n", data.FormName, data.SpreadSheetName)); err != nil {
-								fmt.Println(err)
-							}
+							logwriter.WriteLogToFile(fmt.Sprintf("⚠️ %s -> %s - skipped\n", data.FormName, data.SpreadSheetName))
 							continue
 						}
 
-						if len(values) == 0 {
+						if len(records) == 0 {
+							var err error
 							client := &http.Client{
 								Timeout: 10 * time.Minute,
 							}
-							records, err := a.service.Export(data.CSVLink, data.KoboToken, client)
+							records, err = a.service.Export(data.CSVLink, data.KoboToken, client)
 							if err != nil {
-								if err := logwriter.WriteLogToFile(fmt.Errorf("error while exporting from Kobo %s (%d): %s", data.FormName, data.Id, err)); err != nil {
-									fmt.Println(err)
-								}
+								logwriter.WriteLogToFile(fmt.Errorf("error while exporting from Kobo %s (%d): %s", data.FormName, data.Id, err))
 								if err := a.repo.WriteInfo(data.Id, fmt.Sprintf("ERROR; %s; %s", time.Now().Format(time.DateTime), fmt.Sprintf("Kobo: %s", err))); err != nil {
-									if err := logwriter.WriteLogToFile(fmt.Errorf("error while updating db: %s", err)); err != nil {
-										fmt.Println(err)
-									}
+									logwriter.WriteLogToFile(fmt.Errorf("error while updating db: %s", err))
 								}
 								client.CloseIdleConnections()
 								break
 							}
 							client.CloseIdleConnections()
-							if err := logwriter.WriteLogToFile(fmt.Sprintf("✔️ Info is obtained from form: %s successful.\n", data.FormName)); err != nil {
-								fmt.Println(err)
-							}
-
-							if strings.Contains(data.SpreadSheetName, " -wot") {
-								records = records[1:]
-								fmt.Printf("%s: Founded -wot: deleted titles", data.SpreadSheetName)
-							}
-
-							if strings.Contains(data.SpreadSheetName, " -idx") {
-								fmt.Printf("%s: Founded -idx: changing index", data.SpreadSheetName)
-								records = changingIndex(records)
-							}
-
-							values = a.service.Converter(records)
+							logwriter.WriteLogToFile(fmt.Sprintf("✔️ Info is obtained from form: %s successful.", data.FormName))
 						}
 
-						if len(values) == 0 {
-							if err := logwriter.WriteLogToFile(fmt.Sprintf("⚠️ No values (%s)\n", data.FormName)); err != nil {
-								fmt.Println(err)
-							}
+						if len(records) == 0 {
+							logwriter.WriteLogToFile(fmt.Sprintf("⚠️ No values (%s)", data.FormName))
 							continue
 						}
 
-						err = a.service.Importer(data.APIKey, data.SpreadSheetID, data.SheetName, values)
+						err = a.service.Importer(data.APIKey, data.SpreadSheetName, data.SpreadSheetID, data.SheetName, records)
 						if err != nil {
-							if err := logwriter.WriteLogToFile(fmt.Errorf("🔴 %s - > %s (%d)- Error while importing: %s", data.FormName, data.SpreadSheetName, data.Id, err)); err != nil {
-								fmt.Println(err)
-							}
+							logwriter.WriteLogToFile(fmt.Errorf("🔴 %s - > %s (%d)- Error while importing: %s", data.FormName, data.SpreadSheetName, data.Id, err))
 							if err := a.repo.WriteInfo(data.Id, fmt.Sprintf("ERROR; %s; %s", time.Now().Format(time.DateTime), fmt.Sprintf("GoogleSheets: %s", err))); err != nil {
-								if err := logwriter.WriteLogToFile(fmt.Errorf("error while updating db: %s", err)); err != nil {
-									fmt.Println(err)
-								}
+								logwriter.WriteLogToFile(fmt.Errorf("error while updating db: %s", err))
 							}
 							continue
 						}
-						if err := logwriter.WriteLogToFile(fmt.Sprintf("✔️ %s -> %s - success (id %d).\n", data.FormName, data.SpreadSheetName, data.Id)); err != nil {
-							fmt.Println(err)
-						}
+						logwriter.WriteLogToFile(fmt.Sprintf("✔️ %s -> %s - success (id %d).\n", data.FormName, data.SpreadSheetName, data.Id))
 						if err := a.repo.WriteInfo(data.Id, fmt.Sprintf("Ok; %s", time.Now().Format(time.DateTime))); err != nil {
-							if err := logwriter.WriteLogToFile(fmt.Errorf("error while updating db: %s", err)); err != nil {
-								fmt.Println(err)
-							}
+							logwriter.WriteLogToFile(fmt.Errorf("error while updating db: %s", err))
 						}
 
 					}
@@ -184,34 +146,8 @@ func (a *App) Run(sleepTime string, logLevel string) error {
 		}
 		wg.Wait()
 
-		if err := logwriter.WriteLogToFile(fmt.Sprintf("✔️ Iteration completed. Waiting for next one after: %s\n", sleepTime)); err != nil {
-			fmt.Println(err)
-		}
+		logwriter.WriteLogToFile(fmt.Sprintf("✔️ Iteration completed. Waiting for next one after: %s\n", sleepTime))
 		time.Sleep(sleepTimeParsedDuration)
 	}
 }
 
-func changingIndex(input [][]string) [][]string {
-	indexId := 0
-	for rowId, cells := range input {
-		for cellId, cellValue := range cells {
-			if rowId == 0 {
-				if cellValue == "_index" {
-					indexId = cellId
-				}
-			} else {
-				if indexId == 0 {
-					fmt.Println("Index not found")
-					return input
-				} else {
-					if cellId == indexId {
-						input[rowId][cellId] = "i"+cellValue
-					}
-				}
-
-			}
-
-		}
-	}
-	return input
-}

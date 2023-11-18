@@ -46,7 +46,9 @@ func (r *Requests) GetAllData() ([]models.Data, error) {
 }
 
 func (r *Requests) WriteInfo(id int, info string) error {
-	//message := string([]rune(info)[:254])
+	if len(info) > 254 {
+		info = string([]rune(info)[:254])
+	}
 	query := fmt.Sprintf("UPDATE model_kobo_g_s SET lastresult = '%s' WHERE id = %d", info, id)
 	_, err := r.db.Exec(query)
 	return err

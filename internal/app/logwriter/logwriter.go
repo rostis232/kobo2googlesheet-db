@@ -1,20 +1,20 @@
 package logwriter
 
 import (
-	"fmt"
+	"github.com/fatih/color"
 	"github.com/rostis232/kobo2googlesheet-db/config"
 )
 
-func WriteLogToFile(log any) error {
+func WriteLogToFile(log any) {
 	switch log.(type) {
 	case error:
-		fmt.Println(log)
+		color.Red("%s", log)
 	case string:
 		if config.LogLevel == 0 {
-			fmt.Println(log)
+			color.Green("%s", log)
 		}
 	default:
-		fmt.Println("unknown type of log: ", log)
+		color.Red("unknown type of log: %s", log)
 	}
-	return nil
+	return
 }
