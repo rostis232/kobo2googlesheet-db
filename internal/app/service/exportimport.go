@@ -181,7 +181,6 @@ func changingIndex (input [][]string, numberOfRows int, decr int) ([][]string, e
         copy(inputCopy[i], input[i])
     }
 
-	color.Red("%d, %d", numberOfRows, decr)
 	indexId := 0
 	for rowId, cells := range inputCopy {
 		for cellId, cellValue := range cells {
@@ -199,10 +198,6 @@ func changingIndex (input [][]string, numberOfRows int, decr int) ([][]string, e
 							return inputCopy, fmt.Errorf("error while converting string to ind")
 						}
 						strValue := strconv.Itoa(numberOfRows + indexValueInd - decr)
-						if rowId == 0 || rowId == 1 || rowId == 2 {
-							color.Cyan("%s = %d + %d - %d", strValue, numberOfRows, indexValueInd, decr)
-						}
-
 
 						inputCopy[rowId][cellId] = strValue
 					}
