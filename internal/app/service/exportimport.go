@@ -60,6 +60,7 @@ func (e *ExpImp) Export(csvLink string, token string, client *http.Client) ([][]
 	r := csv.NewReader(strings.NewReader(string(body)))
 	r.Comma = ';'
 	r.Comment = '#'
+	r.FieldsPerRecord = -1
 
 
 	for {
