@@ -91,11 +91,6 @@ func (a *App) Run(sleepTime string, logLevel string) error {
 					var records [][]string
 
 					for _, data := range dataSlice {
-						// //test
-						// if data.SpreadSheetName != "UHF PROT CASE Харків -wot -idx" && data.SpreadSheetName != "UHF PROT CRISIS Харків -wot -idx" && data.SpreadSheetName != "UHF PROT LAW Харків -wot -idx"{
-						// 	continue
-						// }
-						// //test
 
 						if data.Status == 0 {
 							logwriter.WriteLogToFile(fmt.Sprintf("⚠️ %s -> %s - skipped\n", data.FormName, data.SpreadSheetName))

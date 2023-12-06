@@ -29,7 +29,7 @@ func NewExpImp(repo repository.Database) *ExpImp {
 }
 
 func (e *ExpImp) Export(csvLink string, token string, client *http.Client) ([][]string, error) {
-	//client := &http.Client{}
+	var allRecords [][]string
 
 	cutedLink, founded := strings.CutPrefix(csvLink, "https://kobo.humanitarianresponse.info/")
 
@@ -61,12 +61,27 @@ func (e *ExpImp) Export(csvLink string, token string, client *http.Client) ([][]
 	r.Comma = ';'
 	r.Comment = '#'
 
-	records, err := r.ReadAll()
-	if err != nil {
-		return nil, err
-	}
 
-	return records, nil
+	for {
+        // Зчитування одного рядка CSV
+        record, err := r.Read()
+        if err == io.EOF {
+            break // Вийти з циклу, якщо файл закінчився
+        } else if err != nil {
+            return nil, err // Повернути помилку, якщо сталася інша помилка
+        }
+
+        // Додати рядок до загального срізу
+        allRecords = append(allRecords, record)
+    }
+
+	
+	// records, err := r.ReadAll()
+	// if err != nil {
+	// 	return nil, err
+	// }
+
+	return allRecords, nil
 }
 
 func (e *ExpImp) Converter(strs [][]string) [][]interface{} {
