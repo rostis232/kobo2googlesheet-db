@@ -62,21 +62,19 @@ func (e *ExpImp) Export(csvLink string, token string, client *http.Client) ([][]
 	r.Comment = '#'
 	r.FieldsPerRecord = -1
 
-
 	for {
-        // Зчитування одного рядка CSV
-        record, err := r.Read()
-        if err == io.EOF {
-            break // Вийти з циклу, якщо файл закінчився
-        } else if err != nil {
-            return nil, err // Повернути помилку, якщо сталася інша помилка
-        }
+		// Зчитування одного рядка CSV
+		record, err := r.Read()
+		if err == io.EOF {
+			break // Вийти з циклу, якщо файл закінчився
+		} else if err != nil {
+			return nil, err // Повернути помилку, якщо сталася інша помилка
+		}
 
-        // Додати рядок до загального срізу
-        allRecords = append(allRecords, record)
-    }
+		// Додати рядок до загального срізу
+		allRecords = append(allRecords, record)
+	}
 
-	
 	// records, err := r.ReadAll()
 	// if err != nil {
 	// 	return nil, err
@@ -116,7 +114,6 @@ func (e *ExpImp) Importer(credentials string, spreadSheetName string, spreadshee
 		decr = 2
 	}
 
-
 	if strings.Contains(spreadSheetName, " -idx") {
 		fmt.Printf("%s: Founded -idx: changing index\n", spreadSheetName)
 		records, err = changingIndex(records, numberOfRows, decr)
@@ -125,13 +122,16 @@ func (e *ExpImp) Importer(credentials string, spreadSheetName string, spreadshee
 		}
 	}
 
+	if filter := getColumnFilterName(spreadSheetName); filter != "" {
+		records = filterRecords(records, filter)
+	}
+
 	if strings.Contains(spreadSheetName, " -wot") {
 		records = records[1:]
 		fmt.Printf("%s: Founded -wot: deleted titles\n", spreadSheetName)
 	}
 
 	values := e.Converter(records)
-
 
 	ctx := context.Background()
 
@@ -155,7 +155,6 @@ func (e *ExpImp) Importer(credentials string, spreadSheetName string, spreadshee
 	row := &sheets.ValueRange{
 		Values: values,
 	}
-
 
 	_, err = srv.Spreadsheets.Values.Update(spreadsheetId, sheetName, row).ValueInputOption("USER_ENTERED").Context(ctx).Do()
 	if err != nil {
@@ -188,13 +187,13 @@ func (e *ExpImp) Sorter(data []models.Data) map[string]map[string][]models.Data 
 	return dataByAPIKeyAndCSVlink
 }
 
-func changingIndex (input [][]string, numberOfRows int, decr int) ([][]string, error) {
+func changingIndex(input [][]string, numberOfRows int, decr int) ([][]string, error) {
 	inputCopy := make([][]string, len(input))
 
 	for i := range input {
-        inputCopy[i] = make([]string, len(input[i]))
-        copy(inputCopy[i], input[i])
-    }
+		inputCopy[i] = make([]string, len(input[i]))
+		copy(inputCopy[i], input[i])
+	}
 
 	indexId := 0
 	for rowId, cells := range inputCopy {
@@ -223,9 +222,8 @@ func changingIndex (input [][]string, numberOfRows int, decr int) ([][]string, e
 	return inputCopy, nil
 }
 
-
 func getStringNumber(sheetRange string) int {
-	_, after, ok:= strings.Cut(sheetRange, "!A")
+	_, after, ok := strings.Cut(sheetRange, "!A")
 	if !ok {
 		fmt.Println("Error while getting string number (poin 1)")
 	}
@@ -238,4 +236,45 @@ func getStringNumber(sheetRange string) int {
 		fmt.Println("Error while getting string number (poin 2)")
 	}
 	return number
+}
+
+func getColumnFilterName(title string) string {
+	title = strings.ReplaceAll(title, "\"", "'")
+	_, title, foundFilter := strings.Cut(title, "filter='")
+	if !foundFilter {
+		return ""
+	}
+	filter, _, foundFilter := strings.Cut(title, "'")
+	if !foundFilter {
+		return ""
+	}
+	return filter
+}
+
+func filterRecords(records [][]string, filter string) [][]string {
+	var filterColumnID *int
+	newRecords := make([][]string, 0)
+
+	for rowNumber, row := range records {
+		if rowNumber == 0 {
+			var foundedFilterColumn int
+			for columnNumber, cell := range row {
+				if strings.Contains(cell, filter) {
+					foundedFilterColumn = columnNumber
+					filterColumnID = &foundedFilterColumn
+					break
+				}
+			}
+			newRecords = append(newRecords, row)
+		} else {
+			if filterColumnID != nil {
+				if row[*filterColumnID] == "1" {
+					newRecords = append(newRecords, row)
+				}
+			} else {
+				newRecords = append(newRecords, row)
+			}
+		}
+	}
+	return newRecords
 }
