@@ -8,7 +8,7 @@ COPY . /app
 
 WORKDIR /app
 
-RUN CGO_ENABLED=0 go build -o k2gs ./cmd/api
+RUN CGO_ENABLED=0 go build -o k2gs ./cmd/kobo2gs/
 
 RUN chmod +x ./k2gs
 
