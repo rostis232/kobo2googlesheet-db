@@ -6,6 +6,7 @@ import (
 	"encoding/csv"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -115,7 +116,7 @@ func (e *ExpImp) Importer(credentials string, spreadSheetName string, spreadshee
 	}
 
 	if strings.Contains(spreadSheetName, " -idx") {
-		fmt.Printf("%s: Founded -idx: changing index\n", spreadSheetName)
+		log.Printf("%s: Founded -idx: changing index\n", spreadSheetName)
 		records, err = changingIndex(records, numberOfRows, decr)
 		if err != nil {
 			return fmt.Errorf("error while changing indexes: %s", err)
@@ -128,7 +129,7 @@ func (e *ExpImp) Importer(credentials string, spreadSheetName string, spreadshee
 
 	if strings.Contains(spreadSheetName, " -wot") {
 		records = records[1:]
-		fmt.Printf("%s: Founded -wot: deleted titles\n", spreadSheetName)
+		log.Printf("%s: Founded -wot: deleted titles\n", spreadSheetName)
 	}
 
 	values := e.Converter(records)
@@ -225,15 +226,15 @@ func changingIndex(input [][]string, numberOfRows int, decr int) ([][]string, er
 func getStringNumber(sheetRange string) int {
 	_, after, ok := strings.Cut(sheetRange, "!A")
 	if !ok {
-		fmt.Println("Error while getting string number (poin 1)")
+		log.Println("Error while getting string number (poin 1)")
 	}
 	before, _, ok := strings.Cut(after, ":")
 	if !ok {
-		fmt.Println("Error while getting string number (poin 2)")
+		log.Println("Error while getting string number (poin 2)")
 	}
 	number, err := strconv.Atoi(before)
 	if err != nil {
-		fmt.Println("Error while getting string number (poin 2)")
+		log.Println("Error while getting string number (poin 2)")
 	}
 	return number
 }
