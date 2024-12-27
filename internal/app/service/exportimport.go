@@ -84,7 +84,7 @@ func (e *ExpImp) Export(csvLink string, token string, client *http.Client) ([][]
 	return allRecords, nil
 }
 
-func (e *ExpImp) Converter(strs [][]string) [][]interface{} {
+func (e *ExpImp) StringSliceToInterfaceSliceConverter(strs [][]string) [][]interface{} {
 	var result [][]interface{}
 	for _, row := range strs {
 		var interfaceRow []interface{}
@@ -97,6 +97,14 @@ func (e *ExpImp) Converter(strs [][]string) [][]interface{} {
 			interfaceRow = append(interfaceRow, newItem)
 		}
 		result = append(result, interfaceRow)
+	}
+	return result
+}
+
+func (e *ExpImp) StringMapToInterfaceMapConverter(strs map[string][][]string) map[string][][]interface{} {
+	var result = make(map[string][][]interface{})
+	for key, data := range strs {
+		result[key] = e.StringSliceToInterfaceSliceConverter(data)
 	}
 	return result
 }
@@ -132,7 +140,7 @@ func (e *ExpImp) Importer(credentials string, spreadSheetName string, spreadshee
 		log.Printf("%s: Founded -wot: deleted titles\n", spreadSheetName)
 	}
 
-	values := e.Converter(records)
+	values := e.StringSliceToInterfaceSliceConverter(records)
 
 	ctx := context.Background()
 

@@ -5,13 +5,23 @@ go 1.20
 require (
 	github.com/go-sql-driver/mysql v1.6.0
 	github.com/spf13/viper v1.16.0
+	github.com/tealeg/xlsx/v3 v3.3.11
 	golang.org/x/oauth2 v0.7.0
 	google.golang.org/api v0.122.0
 )
 
 require (
+	github.com/frankban/quicktest v1.14.6 // indirect
+	github.com/google/btree v1.0.0 // indirect
+	github.com/google/go-cmp v0.5.9 // indirect
+	github.com/kr/pretty v0.3.1 // indirect
+	github.com/kr/text v0.2.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
+	github.com/peterbourgon/diskv/v3 v3.0.1 // indirect
+	github.com/rogpeppe/fastuuid v1.2.0 // indirect
+	github.com/rogpeppe/go-internal v1.9.0 // indirect
+	github.com/shabbyrobe/xmlwriter v0.0.0-20200208144257-9fca06d00ffa // indirect
 )
 
 require (

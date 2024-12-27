@@ -1,9 +1,11 @@
 package app
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -46,14 +48,6 @@ func (a *App) Run(sleepTime string, logLevel string) error {
 	}
 	for {
 
-		iterationStartTime := time.Now()
-
-		if iterationStartTime.Hour() >= 1 && iterationStartTime.Hour() < 7 {
-			logwriter.WriteLogToFile("Sleep time...")
-			time.Sleep(time.Hour)
-			continue
-		}
-
 		logwriter.WriteLogToFile("✔️ New iteration started")
 
 		data, err := a.repo.GetAllData()
@@ -81,59 +75,19 @@ func (a *App) Run(sleepTime string, logLevel string) error {
 
 			go func(keyAPI string, keyLinkMap map[string][]models.Data, wg *sync.WaitGroup) {
 
-
 				defer wg.Done()
 				logwriter.WriteLogToFile(fmt.Sprintf("✔️ Working with API-key`s set: %s.\n", string([]rune(keyAPI)[:100])))
 
 				for keyKoboLink, dataSlice := range keyLinkMap {
-					logwriter.WriteLogToFile(fmt.Sprintf("✔️ Working with Kobo-form`s set: %s.\n", keyKoboLink))
-
-					var records [][]string
-
-					for _, data := range dataSlice {
-
-						if data.Status == 0 {
-							logwriter.WriteLogToFile(fmt.Sprintf("⚠️ %s -> %s - skipped\n", data.FormName, data.SpreadSheetName))
-							continue
-						}
-
-						if len(records) == 0 {
-							var err error
-							client := &http.Client{
-								Timeout: 10 * time.Minute,
-							}
-							records, err = a.service.Export(data.CSVLink, data.KoboToken, client)
-							if err != nil {
-								logwriter.WriteLogToFile(fmt.Errorf("error while exporting from Kobo %s (%d): %s", data.FormName, data.Id, err))
-								if err := a.repo.WriteInfo(data.Id, fmt.Sprintf("ERROR; %s; %s", time.Now().Format(time.DateTime), fmt.Sprintf("Kobo: %s", err))); err != nil {
-									logwriter.WriteLogToFile(fmt.Errorf("error while updating db: %s", err))
-								}
-								client.CloseIdleConnections()
-								break
-							}
-							client.CloseIdleConnections()
-							logwriter.WriteLogToFile(fmt.Sprintf("✔️ Info is obtained from form: %s successful.", data.FormName))
-						}
-
-						if len(records) == 0 {
-							logwriter.WriteLogToFile(fmt.Sprintf("⚠️ No values (%s)", data.FormName))
-							continue
-						}
-
-						err = a.service.Importer(data.APIKey, data.SpreadSheetName, data.SpreadSheetID, data.SheetName, records)
-						if err != nil {
-							logwriter.WriteLogToFile(fmt.Errorf("🔴 %s - > %s (%d)- Error while importing: %s", data.FormName, data.SpreadSheetName, data.Id, err))
-							if err := a.repo.WriteInfo(data.Id, fmt.Sprintf("ERROR; %s; %s", time.Now().Format(time.DateTime), fmt.Sprintf("GoogleSheets: %s", err))); err != nil {
-								logwriter.WriteLogToFile(fmt.Errorf("error while updating db: %s", err))
-							}
-							continue
-						}
-						logwriter.WriteLogToFile(fmt.Sprintf("✔️ %s -> %s - success (id %d).\n", data.FormName, data.SpreadSheetName, data.Id))
-						if err := a.repo.WriteInfo(data.Id, fmt.Sprintf("Ok; %s", time.Now().Format(time.DateTime))); err != nil {
-							logwriter.WriteLogToFile(fmt.Errorf("error while updating db: %s", err))
-						}
-
+					switch {
+					case strings.HasSuffix(keyKoboLink, ".csv"):
+						a.processCSV(keyKoboLink, dataSlice)
+					case strings.HasSuffix(keyKoboLink, ".xls") || strings.HasSuffix(keyKoboLink, ".xlsx"):
+						a.processXLS(keyKoboLink, dataSlice)
+					default:
+						logwriter.WriteLogToFile(errors.New("wrong kobo link"))
 					}
+
 				}
 
 			}(keyAPI, keyLinkMap, &wg)
@@ -146,3 +100,100 @@ func (a *App) Run(sleepTime string, logLevel string) error {
 	}
 }
 
+func (a *App) processCSV(keyKoboLink string, dataSlice []models.Data) {
+	logwriter.WriteLogToFile(fmt.Sprintf("✔️ Working with Kobo-form`s set: %s.\n", keyKoboLink))
+
+	var records [][]string
+
+	for _, data := range dataSlice {
+
+		if data.Status == 0 {
+			logwriter.WriteLogToFile(fmt.Sprintf("⚠️ %s -> %s - skipped\n", data.FormName, data.SpreadSheetName))
+			continue
+		}
+
+		if len(records) == 0 {
+			var err error
+			client := &http.Client{
+				Timeout: 10 * time.Minute,
+			}
+			records, err = a.service.Export(data.CSVLink, data.KoboToken, client)
+			if err != nil {
+				logwriter.WriteLogToFile(fmt.Errorf("error while exporting from Kobo %s (%d): %s", data.FormName, data.Id, err))
+				if err := a.repo.WriteInfo(data.Id, fmt.Sprintf("ERROR; %s; %s", time.Now().Format(time.DateTime), fmt.Sprintf("Kobo: %s", err))); err != nil {
+					logwriter.WriteLogToFile(fmt.Errorf("error while updating db: %s", err))
+				}
+				client.CloseIdleConnections()
+				break
+			}
+			client.CloseIdleConnections()
+			logwriter.WriteLogToFile(fmt.Sprintf("✔️ Info is obtained from form: %s successful.", data.FormName))
+		}
+
+		if len(records) == 0 {
+			logwriter.WriteLogToFile(fmt.Sprintf("⚠️ No values (%s)", data.FormName))
+			continue
+		}
+
+		err := a.service.Importer(data.APIKey, data.SpreadSheetName, data.SpreadSheetID, data.SheetName, records)
+		if err != nil {
+			logwriter.WriteLogToFile(fmt.Errorf("🔴 %s - > %s (%d)- Error while importing: %s", data.FormName, data.SpreadSheetName, data.Id, err))
+			if err := a.repo.WriteInfo(data.Id, fmt.Sprintf("ERROR; %s; %s", time.Now().Format(time.DateTime), fmt.Sprintf("GoogleSheets: %s", err))); err != nil {
+				logwriter.WriteLogToFile(fmt.Errorf("error while updating db: %s", err))
+			}
+			continue
+		}
+
+		logwriter.WriteLogToFile(fmt.Sprintf("✔️ %s -> %s - success (id %d).\n", data.FormName, data.SpreadSheetName, data.Id))
+
+		if err := a.repo.WriteInfo(data.Id, fmt.Sprintf("Ok; %s", time.Now().Format(time.DateTime))); err != nil {
+			logwriter.WriteLogToFile(fmt.Errorf("error while updating db: %s", err))
+		}
+
+	}
+}
+
+func (a *App) processXLS(keyKoboLink string, dataSlice []models.Data) {
+	logwriter.WriteLogToFile(fmt.Sprintf("✔️ Working with Kobo-form`s set: %s.\n", keyKoboLink))
+
+	var records map[string][][]string
+
+	for _, data := range dataSlice {
+
+		if data.Status == 0 {
+			logwriter.WriteLogToFile(fmt.Sprintf("⚠️ %s -> %s - skipped\n", data.FormName, data.SpreadSheetName))
+			continue
+		}
+
+		if len(records) == 0 {
+			var err error
+			client := &http.Client{
+				Timeout: 10 * time.Minute,
+			}
+			records, err = a.service.ExportXLS(data.CSVLink, data.KoboToken, client)
+			if err != nil {
+				logwriter.WriteLogToFile(fmt.Errorf("error while exporting from Kobo %s (%d): %s", data.FormName, data.Id, err))
+				if err := a.repo.WriteInfo(data.Id, fmt.Sprintf("ERROR; %s; %s", time.Now().Format(time.DateTime), fmt.Sprintf("Kobo: %s", err))); err != nil {
+					logwriter.WriteLogToFile(fmt.Errorf("error while updating db: %s", err))
+				}
+				client.CloseIdleConnections()
+				break
+			}
+			client.CloseIdleConnections()
+			logwriter.WriteLogToFile(fmt.Sprintf("✔️ Info is obtained from form: %s successful.", data.FormName))
+		}
+
+		err := a.service.ImporterXLS(data.APIKey, data.SpreadSheetID, records)
+		if err != nil {
+			logwriter.WriteLogToFile(fmt.Errorf("🔴 %s - > %s (%d)- Error while importing: %s", data.FormName, data.SpreadSheetName, data.Id, err))
+			if err := a.repo.WriteInfo(data.Id, fmt.Sprintf("ERROR; %s; %s", time.Now().Format(time.DateTime), fmt.Sprintf("GoogleSheets: %s", err))); err != nil {
+				logwriter.WriteLogToFile(fmt.Errorf("error while updating db: %s", err))
+			}
+			continue
+		}
+		logwriter.WriteLogToFile(fmt.Sprintf("✔️ %s -> %s - success (id %d).\n", data.FormName, data.SpreadSheetName, data.Id))
+		if err := a.repo.WriteInfo(data.Id, fmt.Sprintf("Ok; %s", time.Now().Format(time.DateTime))); err != nil {
+			logwriter.WriteLogToFile(fmt.Errorf("error while updating db: %s", err))
+		}
+	}
+}
