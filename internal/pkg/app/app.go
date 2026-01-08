@@ -76,7 +76,12 @@ func (a *App) Run(sleepTime string, logLevel string) error {
 			go func(keyAPI string, keyLinkMap map[string][]models.Data, wg *sync.WaitGroup) {
 
 				defer wg.Done()
-				logwriter.WriteLogToFile(fmt.Sprintf("✔️ Working with API-key`s set: %s.\n", string([]rune(keyAPI)[:100])))
+
+				shortKeyAPI := []rune(keyAPI)
+				if len([]rune(keyAPI)) > 20 {
+					shortKeyAPI = shortKeyAPI[:20]
+				}
+				logwriter.WriteLogToFile(fmt.Sprintf("✔️ Working with API-key`s set: %s.\n", string(shortKeyAPI)))
 
 				for keyKoboLink, dataSlice := range keyLinkMap {
 					switch {
