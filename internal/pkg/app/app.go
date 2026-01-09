@@ -113,7 +113,7 @@ func (a *App) processCSV(keyKoboLink string, dataSlice []models.Data) {
 	for _, data := range dataSlice {
 
 		if data.Status == 0 {
-			logwriter.WriteLogToFile(fmt.Sprintf("⚠️ %s -> %s - skipped\n", data.FormName, data.SpreadSheetName))
+			logwriter.WriteLogToFile(fmt.Sprintf("⚠️ %s -> %s - skipped (%d)\n", data.FormName, data.SpreadSheetName, data.Id))
 			continue
 		}
 
@@ -133,17 +133,17 @@ func (a *App) processCSV(keyKoboLink string, dataSlice []models.Data) {
 			if err != nil {
 				logwriter.WriteLogToFile(fmt.Errorf("error while exporting from Kobo %s (%d): %s", data.FormName, data.Id, err))
 				if err := a.repo.WriteInfo(data.Id, fmt.Sprintf("ERROR; %s; %s", time.Now().Format(time.DateTime), fmt.Sprintf("Kobo: %s", err))); err != nil {
-					logwriter.WriteLogToFile(fmt.Errorf("error while updating db: %s", err))
+					logwriter.WriteLogToFile(fmt.Errorf("error while updating db (%d): %s", data.Id, err))
 				}
 				client.CloseIdleConnections()
 				break
 			}
 			client.CloseIdleConnections()
-			logwriter.WriteLogToFile(fmt.Sprintf("✔️ Info is obtained from form: %s successful.", data.FormName))
+			logwriter.WriteLogToFile(fmt.Sprintf("✔️ Info is obtained from form: %s successful (%d)", data.FormName, data.Id))
 		}
 
 		if len(records) == 0 {
-			logwriter.WriteLogToFile(fmt.Sprintf("⚠️ No values (%s)", data.FormName))
+			logwriter.WriteLogToFile(fmt.Sprintf("⚠️ No values (%s) (%d)", data.FormName, data.Id))
 			continue
 		}
 
@@ -159,7 +159,7 @@ func (a *App) processCSV(keyKoboLink string, dataSlice []models.Data) {
 		if err != nil {
 			logwriter.WriteLogToFile(fmt.Errorf("🔴 %s - > %s (%d)- Error while importing: %s", data.FormName, data.SpreadSheetName, data.Id, err))
 			if err := a.repo.WriteInfo(data.Id, fmt.Sprintf("ERROR; %s; %s", time.Now().Format(time.DateTime), fmt.Sprintf("GoogleSheets: %s", err))); err != nil {
-				logwriter.WriteLogToFile(fmt.Errorf("error while updating db: %s", err))
+				logwriter.WriteLogToFile(fmt.Errorf("error while updating db (%d): %s", data.Id, err))
 			}
 			continue
 		}
@@ -167,7 +167,7 @@ func (a *App) processCSV(keyKoboLink string, dataSlice []models.Data) {
 		logwriter.WriteLogToFile(fmt.Sprintf("✔️ %s -> %s - success (id %d).\n", data.FormName, data.SpreadSheetName, data.Id))
 
 		if err := a.repo.WriteInfo(data.Id, fmt.Sprintf("Ok; %s", time.Now().Format(time.DateTime))); err != nil {
-			logwriter.WriteLogToFile(fmt.Errorf("error while updating db: %s", err))
+			logwriter.WriteLogToFile(fmt.Errorf("error while updating db (%d): %s", data.Id, err))
 		}
 
 	}
@@ -181,7 +181,7 @@ func (a *App) processXLS(keyKoboLink string, dataSlice []models.Data) {
 	for _, data := range dataSlice {
 
 		if data.Status == 0 {
-			logwriter.WriteLogToFile(fmt.Sprintf("⚠️ %s -> %s - skipped\n", data.FormName, data.SpreadSheetName))
+			logwriter.WriteLogToFile(fmt.Sprintf("⚠️ %s -> %s - skipped (%d)\n", data.FormName, data.SpreadSheetName, data.Id))
 			continue
 		}
 
@@ -201,7 +201,7 @@ func (a *App) processXLS(keyKoboLink string, dataSlice []models.Data) {
 			if err != nil {
 				logwriter.WriteLogToFile(fmt.Errorf("error while exporting from Kobo %s (%d): %s", data.FormName, data.Id, err))
 				if err := a.repo.WriteInfo(data.Id, fmt.Sprintf("ERROR; %s; %s", time.Now().Format(time.DateTime), fmt.Sprintf("Kobo: %s", err))); err != nil {
-					logwriter.WriteLogToFile(fmt.Errorf("error while updating db: %s", err))
+					logwriter.WriteLogToFile(fmt.Errorf("error while updating db (%d): %s", data.Id, err))
 				}
 				client.CloseIdleConnections()
 				break
@@ -222,13 +222,13 @@ func (a *App) processXLS(keyKoboLink string, dataSlice []models.Data) {
 		if err != nil {
 			logwriter.WriteLogToFile(fmt.Errorf("🔴 %s - > %s (%d)- Error while importing: %s", data.FormName, data.SpreadSheetName, data.Id, err))
 			if err := a.repo.WriteInfo(data.Id, fmt.Sprintf("ERROR; %s; %s", time.Now().Format(time.DateTime), fmt.Sprintf("GoogleSheets: %s", err))); err != nil {
-				logwriter.WriteLogToFile(fmt.Errorf("error while updating db: %s", err))
+				logwriter.WriteLogToFile(fmt.Errorf("error while updating db (%d): %s", data.Id, err))
 			}
 			continue
 		}
 		logwriter.WriteLogToFile(fmt.Sprintf("✔️ %s -> %s - success (id %d).\n", data.FormName, data.SpreadSheetName, data.Id))
 		if err := a.repo.WriteInfo(data.Id, fmt.Sprintf("Ok; %s", time.Now().Format(time.DateTime))); err != nil {
-			logwriter.WriteLogToFile(fmt.Errorf("error while updating db: %s", err))
+			logwriter.WriteLogToFile(fmt.Errorf("error while updating db (%d): %s", data.Id, err))
 		}
 	}
 }
