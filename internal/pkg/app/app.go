@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	_ "time/tzdata"
 
 	"github.com/fatih/color"
 	"github.com/rostis232/kobo2googlesheet-db/config"
@@ -234,6 +235,9 @@ func (a *App) processXLS(keyKoboLink string, dataSlice []models.Data) {
 }
 
 func GetTime() string {
-	loc, _ := time.LoadLocation("Europe/Kyiv")
+	loc, err := time.LoadLocation("Europe/Kyiv")
+	if err != nil {
+		return time.Now().Format(time.DateTime)
+	}
 	return time.Now().In(loc).Format(time.DateTime)
 }
