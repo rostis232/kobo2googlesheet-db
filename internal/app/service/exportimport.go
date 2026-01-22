@@ -173,27 +173,15 @@ func (e *ExpImp) Importer(credentials string, spreadSheetName string, spreadshee
 	return nil
 }
 
-// Sorter sorts data at first by API Key and at second - by CSV Link
-func (e *ExpImp) Sorter(data []models.Data) map[string]map[string][]models.Data {
+// Sorter groups data by API Key
+func (e *ExpImp) Sorter(data []models.Data) map[string][]models.Data {
 	dataByAPIKey := make(map[string][]models.Data)
 
 	for _, d := range data {
 		dataByAPIKey[d.APIKey] = append(dataByAPIKey[d.APIKey], d)
 	}
 
-	dataByAPIKeyAndCSVlink := make(map[string]map[string][]models.Data)
-
-	for k, v := range dataByAPIKey {
-		byCSV := make(map[string][]models.Data)
-
-		for _, n := range v {
-			byCSV[n.CSVLink] = append(byCSV[n.CSVLink], n)
-		}
-
-		dataByAPIKeyAndCSVlink[k] = byCSV
-	}
-
-	return dataByAPIKeyAndCSVlink
+	return dataByAPIKey
 }
 
 func changingIndex(input [][]string, numberOfRows int, decr int) ([][]string, error) {
