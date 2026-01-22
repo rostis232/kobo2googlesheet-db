@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"fmt"
 	_ "github.com/go-sql-driver/mysql"
-	"log"
 )
 
 type Config struct {
@@ -28,6 +27,5 @@ func NewMariaDB(cfg Config) (*sql.DB, error) {
 		return nil, err
 	}
 
-	log.Println("Підключено до бази даних!")
 	return db, nil
 }

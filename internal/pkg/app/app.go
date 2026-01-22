@@ -76,8 +76,12 @@ func (a *App) Run(sleepTime string, logLevel string) error {
 			wg.Add(1)
 
 			go func(keyAPI string, dataSlice []models.Data, wg *sync.WaitGroup) {
-
 				defer wg.Done()
+				defer func() {
+					if r := recover(); r != nil {
+						logwriter.Error(fmt.Errorf("panic in goroutine: %v", r), logrus.Fields{"api_key": keyAPI})
+					}
+				}()
 
 				shortKeyAPI := []rune(keyAPI)
 				if len([]rune(keyAPI)) > 20 {
