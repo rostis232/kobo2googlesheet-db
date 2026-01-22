@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/rostis232/kobo2googlesheet-db/internal/app/logwriter"
+	"github.com/sirupsen/logrus"
 	"github.com/tealeg/xlsx/v3"
 	"io"
 	"net/http"
@@ -17,7 +18,7 @@ func (e *ExpImp) ExportXLS(xlsLink string, token string, client *http.Client) (m
 	cutedLink, founded := strings.CutPrefix(xlsLink, "https://kobo.humanitarianresponse.info/")
 	if founded {
 		xlsLink = "https://eu.kobotoolbox.org/" + cutedLink
-		logwriter.WriteLogToFile(fmt.Sprintf("Founded old URL, changed to new domen: %s", xlsLink))
+		logwriter.Info("Founded old URL, changed to new domain", logrus.Fields{"new_url": xlsLink})
 	}
 
 	request, err := http.NewRequest("GET", xlsLink, nil)

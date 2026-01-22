@@ -16,6 +16,7 @@ import (
 	"github.com/rostis232/kobo2googlesheet-db/internal/app/repository"
 	"github.com/rostis232/kobo2googlesheet-db/internal/app/service"
 	"github.com/rostis232/kobo2googlesheet-db/internal/models"
+	"github.com/sirupsen/logrus"
 )
 
 type App struct {
@@ -49,13 +50,13 @@ func (a *App) Run(sleepTime string, logLevel string) error {
 	}
 	for {
 
-		logwriter.WriteLogToFile("✔️ New iteration started")
+		logwriter.Info("New iteration started", nil)
 
 		data, err := a.repo.GetAllData()
 		if err != nil {
-			logwriter.WriteLogToFile(fmt.Errorf("error while getting data from DB: %s. If there is previous data it will be used in this itereation", err))
+			logwriter.Error(fmt.Errorf("error while getting data from DB"), logrus.Fields{"error": err})
 			if len(dataCache) == 0 {
-				logwriter.WriteLogToFile(fmt.Errorf("previous data is empty. I will try to connect to DB in 10 minutes"))
+				logwriter.Error(fmt.Errorf("previous data is empty. I will try to connect to DB in 10 minutes"), nil)
 				time.Sleep(10 * time.Minute)
 				continue
 			}
@@ -63,11 +64,11 @@ func (a *App) Run(sleepTime string, logLevel string) error {
 			dataCache = data
 		}
 
-		logwriter.WriteLogToFile("✔️ Data is successfully retrieved from DB.")
+		logwriter.Info("Data is successfully retrieved from DB", nil)
 
-		sortedData := a.service.Sorter(data)
+		sortedData := a.service.Sorter(dataCache)
 
-		logwriter.WriteLogToFile("✔️ Data is successfully sorted.")
+		logwriter.Info("Data is successfully sorted", nil)
 
 		wg := sync.WaitGroup{}
 
@@ -82,7 +83,7 @@ func (a *App) Run(sleepTime string, logLevel string) error {
 				if len([]rune(keyAPI)) > 20 {
 					shortKeyAPI = shortKeyAPI[:20]
 				}
-				logwriter.WriteLogToFile(fmt.Sprintf("✔️ Working with API-key`s set: %s.\n", string(shortKeyAPI)))
+				logwriter.Info("Working with API-key`s set", logrus.Fields{"api_key": string(shortKeyAPI)})
 
 				for _, data := range dataSlice {
 					switch {
@@ -91,7 +92,7 @@ func (a *App) Run(sleepTime string, logLevel string) error {
 					case strings.HasSuffix(data.CSVLink, ".xls") || strings.HasSuffix(data.CSVLink, ".xlsx"):
 						a.processXLS(data)
 					default:
-						logwriter.WriteLogToFile(errors.New("wrong kobo link"))
+						logwriter.Error(errors.New("wrong kobo link"), logrus.Fields{"csv_link": data.CSVLink, "form_id": data.Id})
 					}
 
 				}
@@ -101,16 +102,17 @@ func (a *App) Run(sleepTime string, logLevel string) error {
 		}
 		wg.Wait()
 
-		logwriter.WriteLogToFile(fmt.Sprintf("✔️ Iteration completed. Waiting for next one after: %s\n", sleepTime))
+		logwriter.Info("Iteration completed", logrus.Fields{"wait_time": sleepTime})
 		time.Sleep(sleepTimeParsedDuration)
 	}
 }
 
 func (a *App) processCSV(data models.Data) {
-	logwriter.WriteLogToFile(fmt.Sprintf("✔️ Working with Kobo-form`s set: %s.\n", data.CSVLink))
+	startTime := time.Now()
+	logwriter.Info("Working with Kobo-form`s set", logrus.Fields{"csv_link": data.CSVLink, "form_id": data.Id})
 
 	if data.Status == 0 {
-		logwriter.WriteLogToFile(fmt.Sprintf("⚠️ %s -> %s - skipped (%d)\n", data.FormName, data.SpreadSheetName, data.Id))
+		logwriter.Warn("Skipped form", logrus.Fields{"form_name": data.FormName, "spreadsheet_name": data.SpreadSheetName, "form_id": data.Id})
 		return
 	}
 
@@ -124,53 +126,55 @@ func (a *App) processCSV(data models.Data) {
 		if err == nil {
 			break
 		}
-		logwriter.WriteLogToFile(fmt.Errorf("attempt %d failed: error while exporting from Kobo %s (%d): %s", i+1, data.FormName, data.Id, err))
+		logwriter.Error(fmt.Errorf("attempt %d failed: error while exporting from Kobo", i+1), logrus.Fields{"form_name": data.FormName, "form_id": data.Id, "error": err})
 		time.Sleep(5 * time.Second)
 	}
 	if err != nil {
-		logwriter.WriteLogToFile(fmt.Errorf("error while exporting from Kobo %s (%d): %s", data.FormName, data.Id, err))
+		logwriter.Error(fmt.Errorf("error while exporting from Kobo"), logrus.Fields{"form_name": data.FormName, "form_id": data.Id, "error": err})
 		if err := a.repo.WriteInfo(data.Id, fmt.Sprintf("ERROR; %s; %s", GetTime(), fmt.Sprintf("Kobo: %s", err))); err != nil {
-			logwriter.WriteLogToFile(fmt.Errorf("error while updating db (%d): %s", data.Id, err))
+			logwriter.Error(fmt.Errorf("error while updating db"), logrus.Fields{"form_id": data.Id, "error": err})
 		}
 		client.CloseIdleConnections()
 		return
 	}
 	client.CloseIdleConnections()
-	logwriter.WriteLogToFile(fmt.Sprintf("✔️ Info is obtained from form: %s successful (%d)", data.FormName, data.Id))
+	logwriter.Info("Info is obtained from form successful", logrus.Fields{"form_name": data.FormName, "form_id": data.Id, "duration": time.Since(startTime).String()})
 
 	if len(records) == 0 {
-		logwriter.WriteLogToFile(fmt.Sprintf("⚠️ No values (%s) (%d)", data.FormName, data.Id))
+		logwriter.Warn("No values", logrus.Fields{"form_name": data.FormName, "form_id": data.Id})
 		return
 	}
 
+	importStartTime := time.Now()
 	for i := 0; i < 3; i++ {
 		err = a.service.Importer(data.APIKey, data.SpreadSheetName, data.SpreadSheetID, data.SheetName, records)
 		if err == nil {
 			break
 		}
-		logwriter.WriteLogToFile(fmt.Errorf("attempt %d failed: %s - > %s (%d)- Error while importing: %s", i+1, data.FormName, data.SpreadSheetName, data.Id, err))
+		logwriter.Error(fmt.Errorf("attempt %d failed: Error while importing", i+1), logrus.Fields{"form_name": data.FormName, "spreadsheet_name": data.SpreadSheetName, "form_id": data.Id, "error": err})
 		time.Sleep(5 * time.Second)
 	}
 	if err != nil {
-		logwriter.WriteLogToFile(fmt.Errorf("🔴 %s - > %s (%d)- Error while importing: %s", data.FormName, data.SpreadSheetName, data.Id, err))
+		logwriter.Error(fmt.Errorf("Error while importing"), logrus.Fields{"form_name": data.FormName, "spreadsheet_name": data.SpreadSheetName, "form_id": data.Id, "error": err})
 		if err := a.repo.WriteInfo(data.Id, fmt.Sprintf("ERROR; %s; %s", GetTime(), fmt.Sprintf("GoogleSheets: %s", err))); err != nil {
-			logwriter.WriteLogToFile(fmt.Errorf("error while updating db (%d): %s", data.Id, err))
+			logwriter.Error(fmt.Errorf("error while updating db"), logrus.Fields{"form_id": data.Id, "error": err})
 		}
 		return
 	}
 
-	logwriter.WriteLogToFile(fmt.Sprintf("✔️ %s -> %s - success (id %d).\n", data.FormName, data.SpreadSheetName, data.Id))
+	logwriter.Info("Success", logrus.Fields{"form_name": data.FormName, "spreadsheet_name": data.SpreadSheetName, "form_id": data.Id, "duration": time.Since(importStartTime).String(), "total_duration": time.Since(startTime).String()})
 
 	if err := a.repo.WriteInfo(data.Id, fmt.Sprintf("Ok; %s", GetTime())); err != nil {
-		logwriter.WriteLogToFile(fmt.Errorf("error while updating db (%d): %s", data.Id, err))
+		logwriter.Error(fmt.Errorf("error while updating db"), logrus.Fields{"form_id": data.Id, "error": err})
 	}
 }
 
 func (a *App) processXLS(data models.Data) {
-	logwriter.WriteLogToFile(fmt.Sprintf("✔️ Working with Kobo-form`s set: %s.\n", data.CSVLink))
+	startTime := time.Now()
+	logwriter.Info("Working with Kobo-form`s set", logrus.Fields{"csv_link": data.CSVLink, "form_id": data.Id})
 
 	if data.Status == 0 {
-		logwriter.WriteLogToFile(fmt.Sprintf("⚠️ %s -> %s - skipped (%d)\n", data.FormName, data.SpreadSheetName, data.Id))
+		logwriter.Warn("Skipped form", logrus.Fields{"form_name": data.FormName, "spreadsheet_name": data.SpreadSheetName, "form_id": data.Id})
 		return
 	}
 
@@ -184,38 +188,39 @@ func (a *App) processXLS(data models.Data) {
 		if err == nil {
 			break
 		}
-		logwriter.WriteLogToFile(fmt.Errorf("attempt %d failed: error while exporting from Kobo %s (%d): %s", i+1, data.FormName, data.Id, err))
+		logwriter.Error(fmt.Errorf("attempt %d failed: error while exporting from Kobo", i+1), logrus.Fields{"form_name": data.FormName, "form_id": data.Id, "error": err})
 		time.Sleep(5 * time.Second)
 	}
 	if err != nil {
-		logwriter.WriteLogToFile(fmt.Errorf("error while exporting from Kobo %s (%d): %s", data.FormName, data.Id, err))
+		logwriter.Error(fmt.Errorf("error while exporting from Kobo"), logrus.Fields{"form_name": data.FormName, "form_id": data.Id, "error": err})
 		if err := a.repo.WriteInfo(data.Id, fmt.Sprintf("ERROR; %s; %s", GetTime(), fmt.Sprintf("Kobo: %s", err))); err != nil {
-			logwriter.WriteLogToFile(fmt.Errorf("error while updating db (%d): %s", data.Id, err))
+			logwriter.Error(fmt.Errorf("error while updating db"), logrus.Fields{"form_id": data.Id, "error": err})
 		}
 		client.CloseIdleConnections()
 		return
 	}
 	client.CloseIdleConnections()
-	logwriter.WriteLogToFile(fmt.Sprintf("✔️ Info is obtained from form: %s successful.", data.FormName))
+	logwriter.Info("Info is obtained from form successful", logrus.Fields{"form_name": data.FormName, "form_id": data.Id, "duration": time.Since(startTime).String()})
 
+	importStartTime := time.Now()
 	for i := 0; i < 3; i++ {
 		err = a.service.ImporterXLS(data.APIKey, data.SpreadSheetID, records)
 		if err == nil {
 			break
 		}
-		logwriter.WriteLogToFile(fmt.Errorf("attempt %d failed: %s - > %s (%d)- Error while importing: %s", i+1, data.FormName, data.SpreadSheetName, data.Id, err))
+		logwriter.Error(fmt.Errorf("attempt %d failed: Error while importing", i+1), logrus.Fields{"form_name": data.FormName, "spreadsheet_name": data.SpreadSheetName, "form_id": data.Id, "error": err})
 		time.Sleep(5 * time.Second)
 	}
 	if err != nil {
-		logwriter.WriteLogToFile(fmt.Errorf("🔴 %s - > %s (%d)- Error while importing: %s", data.FormName, data.SpreadSheetName, data.Id, err))
+		logwriter.Error(fmt.Errorf("Error while importing"), logrus.Fields{"form_name": data.FormName, "spreadsheet_name": data.SpreadSheetName, "form_id": data.Id, "error": err})
 		if err := a.repo.WriteInfo(data.Id, fmt.Sprintf("ERROR; %s; %s", GetTime(), fmt.Sprintf("GoogleSheets: %s", err))); err != nil {
-			logwriter.WriteLogToFile(fmt.Errorf("error while updating db (%d): %s", data.Id, err))
+			logwriter.Error(fmt.Errorf("error while updating db"), logrus.Fields{"form_id": data.Id, "error": err})
 		}
 		return
 	}
-	logwriter.WriteLogToFile(fmt.Sprintf("✔️ %s -> %s - success (id %d).\n", data.FormName, data.SpreadSheetName, data.Id))
+	logwriter.Info("Success", logrus.Fields{"form_name": data.FormName, "spreadsheet_name": data.SpreadSheetName, "form_id": data.Id, "duration": time.Since(importStartTime).String(), "total_duration": time.Since(startTime).String()})
 	if err := a.repo.WriteInfo(data.Id, fmt.Sprintf("Ok; %s", GetTime())); err != nil {
-		logwriter.WriteLogToFile(fmt.Errorf("error while updating db (%d): %s", data.Id, err))
+		logwriter.Error(fmt.Errorf("error while updating db"), logrus.Fields{"form_id": data.Id, "error": err})
 	}
 }
 

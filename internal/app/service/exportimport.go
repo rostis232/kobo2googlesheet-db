@@ -14,6 +14,7 @@ import (
 	"github.com/rostis232/kobo2googlesheet-db/internal/app/logwriter"
 	"github.com/rostis232/kobo2googlesheet-db/internal/app/repository"
 	"github.com/rostis232/kobo2googlesheet-db/internal/models"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/option"
 	"google.golang.org/api/sheets/v4"
@@ -36,7 +37,7 @@ func (e *ExpImp) Export(csvLink string, token string, client *http.Client) ([][]
 
 	if founded {
 		csvLink = "https://eu.kobotoolbox.org/" + cutedLink
-		logwriter.WriteLogToFile(fmt.Sprintf("Founded old URL, changed to new domen: %s", csvLink))
+		logwriter.Info("Founded old URL, changed to new domain", logrus.Fields{"new_url": csvLink})
 	}
 
 	request, err := http.NewRequest("GET", csvLink, nil)
@@ -124,7 +125,7 @@ func (e *ExpImp) Importer(credentials string, spreadSheetName string, spreadshee
 	}
 
 	if strings.Contains(spreadSheetName, " -idx") {
-		log.Printf("%s: Founded -idx: changing index\n", spreadSheetName)
+		logwriter.Info("Founded -idx: changing index", logrus.Fields{"spreadsheet_name": spreadSheetName})
 		records, err = changingIndex(records, numberOfRows, decr)
 		if err != nil {
 			return fmt.Errorf("error while changing indexes: %s", err)
@@ -137,7 +138,7 @@ func (e *ExpImp) Importer(credentials string, spreadSheetName string, spreadshee
 
 	if strings.Contains(spreadSheetName, " -wot") {
 		records = records[1:]
-		log.Printf("%s: Founded -wot: deleted titles\n", spreadSheetName)
+		logwriter.Info("Founded -wot: deleted titles", logrus.Fields{"spreadsheet_name": spreadSheetName})
 	}
 
 	values := e.StringSliceToInterfaceSliceConverter(records)
