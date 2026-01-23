@@ -51,15 +51,13 @@ func (e *ExpImp) Export(csvLink string, token string, client *http.Client) ([][]
 	if err != nil {
 		return nil, err
 	}
-
-	body, err := io.ReadAll(response.Body)
-	if err != nil {
-		return nil, err
-	}
-
 	defer response.Body.Close()
 
-	r := csv.NewReader(strings.NewReader(string(body)))
+	if response.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code: %d", response.StatusCode)
+	}
+
+	r := csv.NewReader(response.Body)
 	r.Comma = ';'
 	r.Comment = '#'
 	r.FieldsPerRecord = -1
@@ -76,11 +74,6 @@ func (e *ExpImp) Export(csvLink string, token string, client *http.Client) ([][]
 		// Додати рядок до загального срізу
 		allRecords = append(allRecords, record)
 	}
-
-	// records, err := r.ReadAll()
-	// if err != nil {
-	// 	return nil, err
-	// }
 
 	return allRecords, nil
 }

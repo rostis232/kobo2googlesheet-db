@@ -1,8 +1,6 @@
 package service
 
 import (
-	"bytes"
-	"errors"
 	"fmt"
 	"github.com/rostis232/kobo2googlesheet-db/internal/app/logwriter"
 	"github.com/sirupsen/logrus"
@@ -32,22 +30,20 @@ func (e *ExpImp) ExportXLS(xlsLink string, token string, client *http.Client) (m
 	if err != nil {
 		return nil, err
 	}
-
 	defer response.Body.Close()
 
 	if response.StatusCode != http.StatusOK {
-		return allRecords, errors.New(response.Status)
+		return nil, fmt.Errorf("unexpected status code: %d %s", response.StatusCode, response.Status)
 	}
 
-	buf := new(bytes.Buffer)
-	_, err = io.Copy(buf, response.Body)
+	data, err := io.ReadAll(response.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file content: %w", err)
 	}
 
-	workbook, err := xlsx.OpenReaderAt(bytes.NewReader(buf.Bytes()), bytes.NewReader(buf.Bytes()).Size())
+	workbook, err := xlsx.OpenBinary(data)
 	if err != nil {
-		return allRecords, err
+		return nil, err
 	}
 
 	sheets := workbook.Sheets

@@ -21,6 +21,7 @@ import (
 type App struct {
 	service *service.Service
 	repo    *repository.Repository
+	client  *http.Client
 }
 
 func NewApp(dbconf repository.Config) (*App, error) {
@@ -31,6 +32,9 @@ func NewApp(dbconf repository.Config) (*App, error) {
 	}
 	a.repo = repository.NewRepository(db)
 	a.service = service.NewService(*a.repo)
+	a.client = &http.Client{
+		Timeout: 10 * time.Minute,
+	}
 
 	return a, err
 }
@@ -106,11 +110,8 @@ func (a *App) processCSV(data models.Data) {
 
 	var records [][]string
 	var err error
-	client := &http.Client{
-		Timeout: 10 * time.Minute,
-	}
 	for i := 0; i < 3; i++ {
-		records, err = a.service.Export(data.CSVLink, data.KoboToken, client)
+		records, err = a.service.Export(data.CSVLink, data.KoboToken, a.client)
 		if err == nil {
 			break
 		}
@@ -122,10 +123,8 @@ func (a *App) processCSV(data models.Data) {
 		if err := a.repo.WriteInfo(data.Id, fmt.Sprintf("ERROR; %s; %s", GetTime(), fmt.Sprintf("Kobo: %s", err))); err != nil {
 			logwriter.Error(fmt.Errorf("error while updating db"), logrus.Fields{"form_id": data.Id, "error": err})
 		}
-		client.CloseIdleConnections()
 		return
 	}
-	client.CloseIdleConnections()
 	logwriter.Info("Info is obtained from form successful", logrus.Fields{"form_name": data.FormName, "form_id": data.Id, "duration": time.Since(startTime).String()})
 
 	if len(records) == 0 {
@@ -168,11 +167,8 @@ func (a *App) processXLS(data models.Data) {
 
 	var records map[string][][]string
 	var err error
-	client := &http.Client{
-		Timeout: 10 * time.Minute,
-	}
 	for i := 0; i < 3; i++ {
-		records, err = a.service.ExportXLS(data.CSVLink, data.KoboToken, client)
+		records, err = a.service.ExportXLS(data.CSVLink, data.KoboToken, a.client)
 		if err == nil {
 			break
 		}
@@ -184,10 +180,8 @@ func (a *App) processXLS(data models.Data) {
 		if err := a.repo.WriteInfo(data.Id, fmt.Sprintf("ERROR; %s; %s", GetTime(), fmt.Sprintf("Kobo: %s", err))); err != nil {
 			logwriter.Error(fmt.Errorf("error while updating db"), logrus.Fields{"form_id": data.Id, "error": err})
 		}
-		client.CloseIdleConnections()
 		return
 	}
-	client.CloseIdleConnections()
 	logwriter.Info("Info is obtained from form successful", logrus.Fields{"form_name": data.FormName, "form_id": data.Id, "duration": time.Since(startTime).String()})
 
 	importStartTime := time.Now()
