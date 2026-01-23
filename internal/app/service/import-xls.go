@@ -2,10 +2,7 @@ package service
 
 import (
 	"context"
-	b64 "encoding/base64"
 	"fmt"
-	"golang.org/x/oauth2/google"
-	"google.golang.org/api/option"
 	"google.golang.org/api/sheets/v4"
 )
 
@@ -16,19 +13,12 @@ func (e *ExpImp) ImporterXLS(credentials string, spreadsheetId string, records m
 
 	ctx := context.Background()
 
-	credBytes, err := b64.StdEncoding.DecodeString(credentials)
+	srv, err := e.getService(credentials)
 	if err != nil {
 		return err
 	}
 
-	config, err := google.JWTConfigFromJSON(credBytes, "https://www.googleapis.com/auth/spreadsheets")
-	if err != nil {
-		return err
-	}
-
-	client := config.Client(ctx)
-
-	srv, err := sheets.NewService(ctx, option.WithHTTPClient(client))
+	spreadSheet, err := srv.Spreadsheets.Get(spreadsheetId).Context(ctx).Do()
 	if err != nil {
 		return err
 	}
@@ -36,11 +26,6 @@ func (e *ExpImp) ImporterXLS(credentials string, spreadsheetId string, records m
 	for sheetName, sheetData := range values {
 		// Перевіряємо, чи існує аркуш
 		exists := false
-		spreadSheet, err := srv.Spreadsheets.Get(spreadsheetId).Context(ctx).Do()
-		if err != nil {
-			return err
-		}
-
 		for _, s := range spreadSheet.Sheets {
 			if s.Properties.Title == sheetName {
 				exists = true
@@ -63,6 +48,11 @@ func (e *ExpImp) ImporterXLS(credentials string, spreadsheetId string, records m
 			}).Context(ctx).Do()
 			if err != nil {
 				return fmt.Errorf("failed to add new spreadSheet: %s", err)
+			}
+			// Оновлюємо інформацію про таблицю після додавання аркуша
+			spreadSheet, err = srv.Spreadsheets.Get(spreadsheetId).Context(ctx).Do()
+			if err != nil {
+				return err
 			}
 		}
 

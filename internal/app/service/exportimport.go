@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/rostis232/kobo2googlesheet-db/internal/app/logwriter"
 	"github.com/rostis232/kobo2googlesheet-db/internal/app/repository"
@@ -21,13 +22,53 @@ import (
 )
 
 type ExpImp struct {
-	repo repository.Database
+	repo     repository.Database
+	services map[string]*sheets.Service
+	mu       sync.RWMutex
 }
 
 func NewExpImp(repo repository.Database) *ExpImp {
 	return &ExpImp{
-		repo: repo,
+		repo:     repo,
+		services: make(map[string]*sheets.Service),
 	}
+}
+
+func (e *ExpImp) getService(credentials string) (*sheets.Service, error) {
+	e.mu.RLock()
+	if srv, ok := e.services[credentials]; ok {
+		e.mu.RUnlock()
+		return srv, nil
+	}
+	e.mu.RUnlock()
+
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	// Double check after acquiring lock
+	if srv, ok := e.services[credentials]; ok {
+		return srv, nil
+	}
+
+	ctx := context.Background()
+	credBytes, err := b64.StdEncoding.DecodeString(credentials)
+	if err != nil {
+		return nil, err
+	}
+
+	config, err := google.JWTConfigFromJSON(credBytes, "https://www.googleapis.com/auth/spreadsheets")
+	if err != nil {
+		return nil, err
+	}
+
+	client := config.Client(ctx)
+	srv, err := sheets.NewService(ctx, option.WithHTTPClient(client))
+	if err != nil {
+		return nil, err
+	}
+
+	e.services[credentials] = srv
+	return srv, nil
 }
 
 func (e *ExpImp) Export(csvLink string, token string, client *http.Client) ([][]string, error) {
@@ -136,21 +177,7 @@ func (e *ExpImp) Importer(credentials string, spreadSheetName string, spreadshee
 
 	values := e.StringSliceToInterfaceSliceConverter(records)
 
-	ctx := context.Background()
-
-	credBytes, err := b64.StdEncoding.DecodeString(credentials)
-	if err != nil {
-		return err
-	}
-
-	config, err := google.JWTConfigFromJSON(credBytes, "https://www.googleapis.com/auth/spreadsheets")
-	if err != nil {
-		return err
-	}
-
-	client := config.Client(ctx)
-
-	srv, err := sheets.NewService(ctx, option.WithHTTPClient(client))
+	srv, err := e.getService(credentials)
 	if err != nil {
 		return err
 	}
@@ -159,7 +186,7 @@ func (e *ExpImp) Importer(credentials string, spreadSheetName string, spreadshee
 		Values: values,
 	}
 
-	_, err = srv.Spreadsheets.Values.Update(spreadsheetId, sheetName, row).ValueInputOption("USER_ENTERED").Context(ctx).Do()
+	_, err = srv.Spreadsheets.Values.Update(spreadsheetId, sheetName, row).ValueInputOption("USER_ENTERED").Context(context.Background()).Do()
 	if err != nil {
 		return err
 	}

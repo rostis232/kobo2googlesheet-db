@@ -45,6 +45,11 @@ func (e *ExpImp) ExportXLS(xlsLink string, token string, client *http.Client) (m
 	if err != nil {
 		return nil, err
 	}
+	defer func() {
+		for _, sheet := range workbook.Sheets {
+			sheet.Close()
+		}
+	}()
 
 	sheets := workbook.Sheets
 
