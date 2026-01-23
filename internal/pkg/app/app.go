@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 	_ "time/tzdata"
 
@@ -70,41 +69,26 @@ func (a *App) Run(sleepTime string, logLevel string) error {
 
 		logwriter.Info("Data is successfully sorted", nil)
 
-		wg := sync.WaitGroup{}
-
 		for keyAPI, dataSlice := range sortedData {
-			wg.Add(1)
+			shortKeyAPI := []rune(keyAPI)
+			if len([]rune(keyAPI)) > 20 {
+				shortKeyAPI = shortKeyAPI[:20]
+			}
+			logwriter.Info("Working with API-key`s set", logrus.Fields{"api_key": string(shortKeyAPI)})
 
-			go func(keyAPI string, dataSlice []models.Data, wg *sync.WaitGroup) {
-				defer wg.Done()
-				defer func() {
-					if r := recover(); r != nil {
-						logwriter.Error(fmt.Errorf("panic in goroutine: %v", r), logrus.Fields{"api_key": keyAPI})
-					}
-				}()
-
-				shortKeyAPI := []rune(keyAPI)
-				if len([]rune(keyAPI)) > 20 {
-					shortKeyAPI = shortKeyAPI[:20]
-				}
-				logwriter.Info("Working with API-key`s set", logrus.Fields{"api_key": string(shortKeyAPI)})
-
-				for _, data := range dataSlice {
-					switch {
-					case strings.HasSuffix(data.CSVLink, ".csv"):
-						a.processCSV(data)
-					case strings.HasSuffix(data.CSVLink, ".xls") || strings.HasSuffix(data.CSVLink, ".xlsx"):
-						a.processXLS(data)
-					default:
-						logwriter.Error(errors.New("wrong kobo link"), logrus.Fields{"csv_link": data.CSVLink, "form_id": data.Id})
-					}
-
+			for _, data := range dataSlice {
+				switch {
+				case strings.HasSuffix(data.CSVLink, ".csv"):
+					a.processCSV(data)
+				case strings.HasSuffix(data.CSVLink, ".xls") || strings.HasSuffix(data.CSVLink, ".xlsx"):
+					a.processXLS(data)
+				default:
+					logwriter.Error(errors.New("wrong kobo link"), logrus.Fields{"csv_link": data.CSVLink, "form_id": data.Id})
 				}
 
-			}(keyAPI, dataSlice, &wg)
+			}
 
 		}
-		wg.Wait()
 
 		logwriter.Info("Iteration completed", logrus.Fields{"wait_time": sleepTime})
 		time.Sleep(sleepTimeParsedDuration)
