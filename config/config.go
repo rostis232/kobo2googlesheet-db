@@ -1,7 +1,9 @@
 package config
 
-var LogLevel int
+import "github.com/sirupsen/logrus"
 
-func SetLogLevel(i int) {
-	LogLevel = i
+var LogLevel logrus.Level
+
+func SetLogLevel(level logrus.Level) {
+	LogLevel = level
 }

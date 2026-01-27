@@ -2,15 +2,24 @@ package main
 
 import (
 	"github.com/rostis232/kobo2googlesheet-db/internal/pkg/app"
-	"log"
+	"github.com/sirupsen/logrus"
+	"os"
 
 	"github.com/rostis232/kobo2googlesheet-db/internal/app/repository"
 	"github.com/spf13/viper"
 )
 
+func initLogger() {
+	logrus.SetFormatter(&logrus.TextFormatter{
+		FullTimestamp: true,
+	})
+	logrus.SetOutput(os.Stdout)
+}
+
 func main() {
+	initLogger()
 	if err := initConfig(); err != nil {
-		log.Fatalf("Error while db config loading: %s\n", err)
+		logrus.Fatalf("Error while db config loading: %s\n", err)
 	}
 	dbconf := repository.Config{
 		Host:     viper.GetString("db.host"),
@@ -22,11 +31,11 @@ func main() {
 
 	a, err := app.NewApp(dbconf)
 	if err != nil {
-		log.Fatalf("Error while creating new app: %s\n", err)
+		logrus.Fatalf("Error while creating new app: %s\n", err)
 	}
-	log.Println("Підключено до бази даних!")
+	logrus.Info("Підключено до бази даних!")
 	if err := a.Run(viper.GetString("app.sleep-time"), viper.GetString("app.log-level")); err != nil {
-		log.Fatalf("Error while running app: %s\n", err)
+		logrus.Fatalf("Error while running app: %s\n", err)
 	}
 
 }

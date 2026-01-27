@@ -12,7 +12,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/rostis232/kobo2googlesheet-db/internal/app/logwriter"
 	"github.com/rostis232/kobo2googlesheet-db/internal/app/repository"
 	"github.com/rostis232/kobo2googlesheet-db/internal/models"
 	"github.com/sirupsen/logrus"
@@ -78,7 +77,7 @@ func (e *ExpImp) Export(csvLink string, token string, client *http.Client) ([][]
 
 	if founded {
 		csvLink = "https://eu.kobotoolbox.org/" + cutedLink
-		logwriter.Info("Founded old URL, changed to new domain", logrus.Fields{"new_url": csvLink})
+		logrus.WithFields(logrus.Fields{"new_url": csvLink}).Info("Founded old URL, changed to new domain")
 	}
 
 	request, err := http.NewRequest("GET", csvLink, nil)
@@ -159,7 +158,7 @@ func (e *ExpImp) Importer(credentials string, spreadSheetName string, spreadshee
 	}
 
 	if strings.Contains(spreadSheetName, " -idx") {
-		logwriter.Info("Founded -idx: changing index", logrus.Fields{"spreadsheet_name": spreadSheetName})
+		logrus.WithFields(logrus.Fields{"spreadsheet_name": spreadSheetName}).Info("Founded -idx: changing index")
 		records, err = changingIndex(records, numberOfRows, decr)
 		if err != nil {
 			return fmt.Errorf("error while changing indexes: %s", err)
@@ -172,7 +171,7 @@ func (e *ExpImp) Importer(credentials string, spreadSheetName string, spreadshee
 
 	if strings.Contains(spreadSheetName, " -wot") {
 		records = records[1:]
-		logwriter.Info("Founded -wot: deleted titles", logrus.Fields{"spreadsheet_name": spreadSheetName})
+		logrus.WithFields(logrus.Fields{"spreadsheet_name": spreadSheetName}).Info("Founded -wot: deleted titles")
 	}
 
 	values := e.StringSliceToInterfaceSliceConverter(records)

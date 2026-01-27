@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/rostis232/kobo2googlesheet-db/internal/models"
+	"github.com/sirupsen/logrus"
 )
 
 func FilterTask(tasks []models.Data) []models.Data {
@@ -26,8 +27,7 @@ func FilterTask(tasks []models.Data) []models.Data {
 		}
 	}
 
-	fmt.Printf("Filtered tasks: %d\n", len(result))
-
+	logrus.WithFields(logrus.Fields{"count": len(result)}).Info("Filtered tasks")
 	return result
 }
 
