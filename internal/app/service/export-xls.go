@@ -6,6 +6,7 @@ import (
 	"github.com/tealeg/xlsx/v3"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 )
 
@@ -35,12 +36,22 @@ func (e *ExpImp) ExportXLS(xlsLink string, token string, client *http.Client) (m
 		return nil, fmt.Errorf("unexpected status code: %d %s", response.StatusCode, response.Status)
 	}
 
-	data, err := io.ReadAll(response.Body)
+	tempFile, err := os.CreateTemp("", "kobo-*.xlsx")
 	if err != nil {
-		return nil, fmt.Errorf("failed to read file content: %w", err)
+		return nil, fmt.Errorf("failed to create temp file: %w", err)
+	}
+	defer os.Remove(tempFile.Name())
+	defer tempFile.Close()
+
+	if _, err := io.Copy(tempFile, response.Body); err != nil {
+		return nil, fmt.Errorf("failed to save response to temp file: %w", err)
 	}
 
-	workbook, err := xlsx.OpenBinary(data)
+	if _, err := tempFile.Seek(0, 0); err != nil {
+		return nil, fmt.Errorf("failed to seek temp file: %w", err)
+	}
+
+	workbook, err := xlsx.OpenFile(tempFile.Name())
 	if err != nil {
 		return nil, err
 	}
