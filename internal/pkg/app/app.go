@@ -46,7 +46,6 @@ func (a *App) Run(sleepTime string, logLevel string) error {
 		logLevelInt = 0
 	}
 	config.SetLogLevel(logLevelInt)
-	var dataCache []models.Data
 	sleepTimeParsedDuration, err := time.ParseDuration(sleepTime)
 	if err != nil {
 		return err
@@ -58,18 +57,14 @@ func (a *App) Run(sleepTime string, logLevel string) error {
 		data, err := a.repo.GetAllData()
 		if err != nil {
 			logwriter.Error(fmt.Errorf("error while getting data from DB"), logrus.Fields{"error": err})
-			if len(dataCache) == 0 {
-				logwriter.Error(fmt.Errorf("previous data is empty. I will try to connect to DB in 10 minutes"), nil)
-				time.Sleep(10 * time.Minute)
-				continue
-			}
-		} else {
-			dataCache = data
+			continue
 		}
+
+		filteredData := service.FilterTask(data)
 
 		logwriter.Info("Data is successfully retrieved from DB", nil)
 
-		sortedData := a.service.Sorter(dataCache)
+		sortedData := a.service.Sorter(filteredData)
 
 		logwriter.Info("Data is successfully sorted", nil)
 

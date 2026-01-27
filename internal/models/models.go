@@ -1,5 +1,7 @@
 package models
 
+import "database/sql"
+
 type Data struct {
 	Id              int
 	UserId          int
@@ -11,4 +13,5 @@ type Data struct {
 	SpreadSheetName string
 	SheetName       string
 	APIKey          string
+	LastResult      sql.NullString
 }
