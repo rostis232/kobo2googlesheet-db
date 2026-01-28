@@ -135,14 +135,6 @@ func (e *ExpImp) StringSliceToInterfaceSliceConverter(strs [][]string) [][]inter
 	return result
 }
 
-func (e *ExpImp) StringMapToInterfaceMapConverter(strs map[string][][]string) map[string][][]interface{} {
-	var result = make(map[string][][]interface{})
-	for key, data := range strs {
-		result[key] = e.StringSliceToInterfaceSliceConverter(data)
-	}
-	return result
-}
-
 func (e *ExpImp) Importer(credentials string, spreadSheetName string, spreadsheetId string, sheetName string, records [][]string) error {
 	var err error
 	var decr int = 1

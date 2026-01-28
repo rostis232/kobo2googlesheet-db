@@ -157,10 +157,20 @@ func (a *App) processXLS(data models.Data) {
 		return
 	}
 
-	var records map[string][][]string
 	var err error
 	for i := 0; i < 3; i++ {
-		records, err = a.service.ExportXLS(data.CSVLink, data.KoboToken, a.client)
+		err = a.service.ExportXLS(data.CSVLink, data.KoboToken, a.client, func(sheetName string, records [][]string) error {
+			var importErr error
+			for j := 0; j < 3; j++ {
+				importErr = a.service.ImporterXLS(data.APIKey, data.SpreadSheetID, sheetName, records)
+				if importErr == nil {
+					break
+				}
+				logrus.WithFields(logrus.Fields{"form_name": data.FormName, "spreadsheet_name": data.SpreadSheetName, "sheet_name": sheetName, "form_id": data.Id, "error": importErr}).Errorf("attempt %d failed: Error while importing sheet", j+1)
+				time.Sleep(5 * time.Second)
+			}
+			return importErr
+		})
 		if err == nil {
 			break
 		}
@@ -168,31 +178,15 @@ func (a *App) processXLS(data models.Data) {
 		time.Sleep(5 * time.Second)
 	}
 	if err != nil {
-		logrus.WithFields(logrus.Fields{"form_name": data.FormName, "form_id": data.Id, "error": err}).Error("error while exporting from Kobo")
-		if err := a.repo.WriteInfo(data.Id, fmt.Sprintf("ERROR; %s; %s", GetTime(), fmt.Sprintf("Kobo: %s", err))); err != nil {
+		logrus.WithFields(logrus.Fields{"form_name": data.FormName, "form_id": data.Id, "error": err}).Error("error while exporting/importing XLS from Kobo")
+		if err := a.repo.WriteInfo(data.Id, fmt.Sprintf("ERROR; %s; %s", GetTime(), fmt.Sprintf("XLS Process: %s", err))); err != nil {
 			logrus.WithFields(logrus.Fields{"form_id": data.Id, "error": err}).Error("error while updating db")
 		}
 		return
 	}
-	logrus.WithFields(logrus.Fields{"form_name": data.FormName, "form_id": data.Id, "duration": time.Since(startTime).String()}).Info("Info is obtained from form successful")
+	logrus.WithFields(logrus.Fields{"form_name": data.FormName, "form_id": data.Id, "duration": time.Since(startTime).String()}).Info("Info is obtained and imported successful")
 
-	importStartTime := time.Now()
-	for i := 0; i < 3; i++ {
-		err = a.service.ImporterXLS(data.APIKey, data.SpreadSheetID, records)
-		if err == nil {
-			break
-		}
-		logrus.WithFields(logrus.Fields{"form_name": data.FormName, "spreadsheet_name": data.SpreadSheetName, "form_id": data.Id, "error": err}).Errorf("attempt %d failed: Error while importing", i+1)
-		time.Sleep(5 * time.Second)
-	}
-	if err != nil {
-		logrus.WithFields(logrus.Fields{"form_name": data.FormName, "spreadsheet_name": data.SpreadSheetName, "form_id": data.Id, "error": err}).Error("Error while importing")
-		if err := a.repo.WriteInfo(data.Id, fmt.Sprintf("ERROR; %s; %s", GetTime(), fmt.Sprintf("GoogleSheets: %s", err))); err != nil {
-			logrus.WithFields(logrus.Fields{"form_id": data.Id, "error": err}).Error("error while updating db")
-		}
-		return
-	}
-	logrus.WithFields(logrus.Fields{"form_name": data.FormName, "spreadsheet_name": data.SpreadSheetName, "form_id": data.Id, "duration": time.Since(importStartTime).String(), "total_duration": time.Since(startTime).String()}).Info("Success")
+	logrus.WithFields(logrus.Fields{"form_name": data.FormName, "spreadsheet_name": data.SpreadSheetName, "form_id": data.Id, "total_duration": time.Since(startTime).String()}).Info("Success")
 	if err := a.repo.WriteInfo(data.Id, fmt.Sprintf("Ok; %s", GetTime())); err != nil {
 		logrus.WithFields(logrus.Fields{"form_id": data.Id, "error": err}).Error("error while updating db")
 	}

@@ -3,16 +3,14 @@ package service
 import (
 	"fmt"
 	"github.com/sirupsen/logrus"
-	"github.com/tealeg/xlsx/v3"
+	"github.com/xuri/excelize/v2"
 	"io"
 	"net/http"
 	"os"
 	"strings"
 )
 
-func (e *ExpImp) ExportXLS(xlsLink string, token string, client *http.Client) (map[string][][]string, error) {
-	var allRecords = make(map[string][][]string)
-
+func (e *ExpImp) ExportXLS(xlsLink string, token string, client *http.Client, callback func(sheetName string, records [][]string) error) error {
 	cutedLink, founded := strings.CutPrefix(xlsLink, "https://kobo.humanitarianresponse.info/")
 	if founded {
 		xlsLink = "https://eu.kobotoolbox.org/" + cutedLink
@@ -21,72 +19,73 @@ func (e *ExpImp) ExportXLS(xlsLink string, token string, client *http.Client) (m
 
 	request, err := http.NewRequest("GET", xlsLink, nil)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	request.Header.Add("Authorization", "Token "+token)
 
 	response, err := client.Do(request)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer response.Body.Close()
 
 	if response.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status code: %d %s", response.StatusCode, response.Status)
+		return fmt.Errorf("unexpected status code: %d %s", response.StatusCode, response.Status)
 	}
 
 	tempFile, err := os.CreateTemp("", "kobo-*.xlsx")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create temp file: %w", err)
+		return fmt.Errorf("failed to create temp file: %w", err)
 	}
 	defer os.Remove(tempFile.Name())
 	defer tempFile.Close()
 
 	if _, err := io.Copy(tempFile, response.Body); err != nil {
-		return nil, fmt.Errorf("failed to save response to temp file: %w", err)
+		return fmt.Errorf("failed to save response to temp file: %w", err)
 	}
 
 	if _, err := tempFile.Seek(0, 0); err != nil {
-		return nil, fmt.Errorf("failed to seek temp file: %w", err)
+		return fmt.Errorf("failed to seek temp file: %w", err)
 	}
 
-	workbook, err := xlsx.OpenFile(tempFile.Name())
+	f, err := excelize.OpenFile(tempFile.Name())
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer func() {
-		for _, sheet := range workbook.Sheets {
-			sheet.Close()
+		if err := f.Close(); err != nil {
+			logrus.WithError(err).Error("failed to close excelize file")
 		}
 	}()
 
-	sheets := workbook.Sheets
+	sheets := f.GetSheetList()
 
-	for _, sheet := range sheets {
+	for _, sheetName := range sheets {
 		sheetRecords := [][]string{}
 
-		err = sheet.ForEachRow(func(row *xlsx.Row) error {
-			rowRecords := []string{}
-
-			err = row.ForEachCell(func(cell *xlsx.Cell) error {
-				rowRecords = append(rowRecords, cell.String())
-				return nil
-			})
-			if err != nil {
-				return err
-			}
-
-			sheetRecords = append(sheetRecords, rowRecords)
-			return nil
-		})
-
+		rows, err := f.Rows(sheetName)
 		if err != nil {
-			return allRecords, err
+			return err
 		}
 
-		allRecords[sheet.Name] = sheetRecords
+		for rows.Next() {
+			row, err := rows.Columns()
+			if err != nil {
+				rows.Close()
+				return err
+			}
+			sheetRecords = append(sheetRecords, row)
+		}
+
+		if err = rows.Close(); err != nil {
+			return err
+		}
+
+		if err := callback(sheetName, sheetRecords); err != nil {
+			return err
+		}
 	}
 
-	return allRecords, nil
+	return nil
 }
